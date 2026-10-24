@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kalshi-arbitrage-lab"
+version = "0.1.0"
+description = "Exact payoff accounting and public market-data capture for prediction-market arbitrage research"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+kalshi-lab = "kalshi_lab.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["kalshi_lab*"]

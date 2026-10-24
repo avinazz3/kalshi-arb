@@ -1,0 +1,52 @@
+{
+  "generated_at": "2026-10-24T16:44:02.107415+00:00",
+  "markets": {
+    "KXCPI-26OCT-T0.1": {
+      "http_attempts": 2,
+      "valid_books": 2,
+      "invalid_or_failed": 0,
+      "empty_yes_bid_books": 0,
+      "empty_no_bid_books": 0,
+      "first_received_at": "2026-10-24T16:42:57.290694+00:00",
+      "last_received_at": "2026-10-24T16:43:26.756257+00:00",
+      "latest_yes_ask": "0.9000",
+      "latest_no_ask": "0.1100"
+    },
+    "KXCPI-26OCT-T0.2": {
+      "http_attempts": 2,
+      "valid_books": 2,
+      "invalid_or_failed": 0,
+      "empty_yes_bid_books": 0,
+      "empty_no_bid_books": 0,
+      "first_received_at": "2026-10-24T16:43:04.655025+00:00",
+      "last_received_at": "2026-10-24T16:43:34.098856+00:00",
+      "latest_yes_ask": "0.6600",
+      "latest_no_ask": "0.3600"
+    },
+    "KXCPI-26OCT-T0.3": {
+      "http_attempts": 2,
+      "valid_books": 2,
+      "invalid_or_failed": 0,
+      "empty_yes_bid_books": 0,
+      "empty_no_bid_books": 0,
+      "first_received_at": "2026-10-24T16:43:12.078729+00:00",
+      "last_received_at": "2026-10-24T16:43:41.494415+00:00",
+      "latest_yes_ask": "0.2300",
+      "latest_no_ask": "0.7800"
+    },
+    "KXCPI-26OCT-T0.4": {
+      "http_attempts": 2,
+      "valid_books": 2,
+      "invalid_or_failed": 0,
+      "empty_yes_bid_books": 0,
+      "empty_no_bid_books": 0,
+      "first_received_at": "2026-10-24T16:43:19.427089+00:00",
+      "last_received_at": "2026-10-24T16:43:48.911424+00:00",
+      "latest_yes_ask": "0.0700",
+      "latest_no_ask": "0.9400"
+    }
+  },
+  "median_successful_request_ms": 7128.497688999914,
+  "maximum_observed_sweep_receipt_span_seconds": 22.155167,
+  "interpretation": "REST samples are asynchronous; receipt spans are not exchange-clock latency or opportunity duration. No fees or net opportunities estimated."
+}
