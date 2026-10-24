@@ -1,0 +1,13 @@
+{
+  "series_ticker": "KXCPI",
+  "event_ticker": "KXCPI-26OCT",
+  "purpose": "data_collection_only",
+  "tickers": [
+    "KXCPI-26OCT-T0.1",
+    "KXCPI-26OCT-T0.2",
+    "KXCPI-26OCT-T0.3",
+    "KXCPI-26OCT-T0.4"
+  ],
+  "selection": "highest retrieved event volume; strikes closest to 50-cent midpoint",
+  "relations_reviewed": false
+}

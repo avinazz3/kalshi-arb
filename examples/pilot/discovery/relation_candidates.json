@@ -1,0 +1,488 @@
+[
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T-0.1",
+    "higher_ticker": "KXCPI-26DEC-T0.0",
+    "lower_strike": "-0.1",
+    "higher_strike": "0",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.0",
+    "higher_ticker": "KXCPI-26DEC-T0.1",
+    "lower_strike": "0",
+    "higher_strike": "0.1",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.1",
+    "higher_ticker": "KXCPI-26DEC-T0.2",
+    "lower_strike": "0.1",
+    "higher_strike": "0.2",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.2",
+    "higher_ticker": "KXCPI-26DEC-T0.3",
+    "lower_strike": "0.2",
+    "higher_strike": "0.3",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.3",
+    "higher_ticker": "KXCPI-26DEC-T0.4",
+    "lower_strike": "0.3",
+    "higher_strike": "0.4",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.4",
+    "higher_ticker": "KXCPI-26DEC-T0.5",
+    "lower_strike": "0.4",
+    "higher_strike": "0.5",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.5",
+    "higher_ticker": "KXCPI-26DEC-T0.6",
+    "lower_strike": "0.5",
+    "higher_strike": "0.6",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.6",
+    "higher_ticker": "KXCPI-26DEC-T0.7",
+    "lower_strike": "0.6",
+    "higher_strike": "0.7",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.7",
+    "higher_ticker": "KXCPI-26DEC-T0.8",
+    "lower_strike": "0.7",
+    "higher_strike": "0.8",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26DEC",
+    "lower_ticker": "KXCPI-26DEC-T0.8",
+    "higher_ticker": "KXCPI-26DEC-T0.9",
+    "lower_strike": "0.8",
+    "higher_strike": "0.9",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26NOV",
+    "lower_ticker": "KXCPI-26NOV-T-0.1",
+    "higher_ticker": "KXCPI-26NOV-T0.0",
+    "lower_strike": "-0.1",
+    "higher_strike": "0",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26NOV",
+    "lower_ticker": "KXCPI-26NOV-T0.0",
+    "higher_ticker": "KXCPI-26NOV-T0.1",
+    "lower_strike": "0",
+    "higher_strike": "0.1",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26NOV",
+    "lower_ticker": "KXCPI-26NOV-T0.1",
+    "higher_ticker": "KXCPI-26NOV-T0.2",
+    "lower_strike": "0.1",
+    "higher_strike": "0.2",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26NOV",
+    "lower_ticker": "KXCPI-26NOV-T0.2",
+    "higher_ticker": "KXCPI-26NOV-T0.3",
+    "lower_strike": "0.2",
+    "higher_strike": "0.3",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26NOV",
+    "lower_ticker": "KXCPI-26NOV-T0.3",
+    "higher_ticker": "KXCPI-26NOV-T0.4",
+    "lower_strike": "0.3",
+    "higher_strike": "0.4",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26NOV",
+    "lower_ticker": "KXCPI-26NOV-T0.4",
+    "higher_ticker": "KXCPI-26NOV-T0.5",
+    "lower_strike": "0.4",
+    "higher_strike": "0.5",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T-0.1",
+    "higher_ticker": "KXCPI-26OCT-T0.0",
+    "lower_strike": "-0.1",
+    "higher_strike": "0",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.0",
+    "higher_ticker": "KXCPI-26OCT-T0.1",
+    "lower_strike": "0",
+    "higher_strike": "0.1",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.1",
+    "higher_ticker": "KXCPI-26OCT-T0.2",
+    "lower_strike": "0.1",
+    "higher_strike": "0.2",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.2",
+    "higher_ticker": "KXCPI-26OCT-T0.3",
+    "lower_strike": "0.2",
+    "higher_strike": "0.3",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.3",
+    "higher_ticker": "KXCPI-26OCT-T0.4",
+    "lower_strike": "0.3",
+    "higher_strike": "0.4",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.4",
+    "higher_ticker": "KXCPI-26OCT-T0.5",
+    "lower_strike": "0.4",
+    "higher_strike": "0.5",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.5",
+    "higher_ticker": "KXCPI-26OCT-T0.6",
+    "lower_strike": "0.5",
+    "higher_strike": "0.6",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.6",
+    "higher_ticker": "KXCPI-26OCT-T0.7",
+    "lower_strike": "0.6",
+    "higher_strike": "0.7",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.7",
+    "higher_ticker": "KXCPI-26OCT-T0.8",
+    "lower_strike": "0.7",
+    "higher_strike": "0.8",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.8",
+    "higher_ticker": "KXCPI-26OCT-T0.9",
+    "lower_strike": "0.8",
+    "higher_strike": "0.9",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  },
+  {
+    "event_ticker": "KXCPI-26OCT",
+    "lower_ticker": "KXCPI-26OCT-T0.9",
+    "higher_ticker": "KXCPI-26OCT-T1.0",
+    "lower_strike": "0.9",
+    "higher_strike": "1",
+    "proposed_relation": "YES_higher_implies_YES_lower",
+    "review_status": "unreviewed",
+    "rule_checks": {
+      "same_underlying_and_reference_period": false,
+      "same_source_and_revision_policy": false,
+      "threshold_boundaries_and_rounding": false,
+      "delay_void_and_nonbinary_settlement": false,
+      "contract_terms_and_rulebook_reviewed": false,
+      "effective_fees_reviewed": false
+    },
+    "review_notes": "Metadata proposal only; not a certified relationship."
+  }
+]
