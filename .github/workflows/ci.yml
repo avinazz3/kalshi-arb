@@ -29,5 +29,10 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Synthetic payoff example
         run: kalshi-lab demo
+      - name: Fee scenarios and explicit JSON input
+        run: |
+          kalshi-lab fee-demo
+          kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.0001
+          kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.01
       - name: Inspect recorded public-data pilot
         run: python -m kalshi_lab inspect --db examples/pilot/orderbooks.sqlite

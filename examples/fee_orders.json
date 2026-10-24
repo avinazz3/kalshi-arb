@@ -1,0 +1,21 @@
+{
+  "policy": {
+    "model": "quadratic",
+    "taker_multiplier": "1",
+    "maker_multiplier": "0"
+  },
+  "orders": [
+    {
+      "order_id": "lower_threshold_yes",
+      "fills": [
+        {"price_dollars": "0.44", "quantity": "8", "liquidity": "taker", "direction": "buy"}
+      ]
+    },
+    {
+      "order_id": "higher_threshold_no",
+      "fills": [
+        {"price_dollars": "0.52", "quantity": "8", "liquidity": "taker", "direction": "buy"}
+      ]
+    }
+  ]
+}

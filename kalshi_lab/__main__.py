@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+from decimal import Decimal
 import json
 from pathlib import Path
 import sqlite3
@@ -11,6 +12,7 @@ from urllib.parse import quote
 from .books import asks, bids, threshold_pair_quote
 from .client import Client, utc_now
 from .discovery import candidates, choose_watchlist
+from .fees import calculate_orders, synthetic_pair_document
 from .storage import Store
 
 
@@ -166,10 +168,40 @@ def positive_int(value):
     return number
 
 
+def fees(args):
+    document = json.loads(Path(args.input).read_text(encoding="utf-8"), parse_float=str)
+    result = calculate_orders(document, args.balance_precision)
+    if args.out:
+        write_json(args.out, result)
+    print(dump(result))
+
+
+def fee_demo(_args):
+    scenarios = []
+    for precision in ("0.0001", "0.01"):
+        result = calculate_orders(synthetic_pair_document(), precision)
+        # Only this synthetic example assumes q=8 and ordinary nested binary payout.
+        result["minimum_normal_settlement_dollars"] = Decimal("8")
+        result["gross_surplus_dollars"] = Decimal("0.32")
+        result["surplus_after_modelled_fees_dollars"] = Decimal("8") + result["total_cash_change_dollars"]
+        scenarios.append(result)
+    print(dump({
+        "synthetic_example": True,
+        "assumptions": "Two separate one-fill taker orders, supplied multiplier 1, ordinary binary settlement; not live quotes or account-reconciled fees.",
+        "scenarios": scenarios,
+    }))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Kalshi research starter: public GET-only collection and exact payoff examples")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo", help="Offline synthetic depth/payoff example").set_defaults(run=demo)
+    sub.add_parser("fee-demo", help="Synthetic pair under both documented balance precisions").set_defaults(run=fee_demo)
+    p = sub.add_parser("fees", help="Calculate modelled fees for explicit policy and ordered fills")
+    p.add_argument("--input", required=True, help="JSON file containing policy and orders")
+    p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"), help="Account precision in dollars; never inferred")
+    p.add_argument("--out", help="Optional JSON report path")
+    p.set_defaults(run=fees)
     p = sub.add_parser("discover", help="Retrieve series, markets and unreviewed threshold proposals")
     p.add_argument("--series", default="KXCPI")
     p.add_argument("--event", help="Optional exact event ticker; otherwise choose by retrieved volume")

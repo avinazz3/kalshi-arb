@@ -18,12 +18,6 @@ python3 --version
 Use Python 3.10 or newer. No third-party packages, API keys or funding are needed
 for this milestone. On Windows use `py` in place of `python3` if appropriate.
 
-While the initial implementation pull request is open, switch to its branch:
-
-```bash
-git switch codex/kalshi-research-starter
-```
-
 Run the offline example, then its checks:
 
 ```bash
@@ -38,6 +32,24 @@ surplus is $0.32. An **invented $0.20 total fee reserve** leaves $0.12. This res
 is not an estimate of the current Kalshi fee. Expanding to 20 pairs reduces gross
 surplus to $0.20 because the later pairs cost $1.01 each. This is illustrative,
 not a recorded market opportunity.
+
+## Calculate fees with an explicit policy
+
+```bash
+python3 -m kalshi_lab fee-demo
+python3 -m kalshi_lab fees --input examples/fee_orders.json --balance-precision 0.0001
+```
+
+The reusable calculator supports the documented quadratic model, separate maker
+and taker multipliers, fractional fills and rounding carried within each order.
+Both multipliers and the account precision must be supplied; unsupported models
+are rejected. It does not select an effective policy from a market ticker.
+
+For the synthetic eight-pair example, modelled fees total $0.2778 at $0.0001
+balance precision, leaving $0.0422 of conditional surplus. At $0.01 precision,
+the corresponding figures are $0.28 and $0.04. These are scenario calculations,
+not observed fills or demonstrated live profits. See
+[`docs/FEE_MODEL.md`](docs/FEE_MODEL.md) for hand calculations, inputs and limits.
 
 ## Discover the first research universe
 
@@ -110,9 +122,10 @@ is useful for deeper analysis; there is no need to send credentials.
 ## Current boundary
 
 Implemented: public GET-only discovery and capture, metadata-derived proposals,
-capture-quality report, exact depth/payoff accounting, offline economic checks.
+capture-quality report, exact depth/payoff accounting, configured quadratic fee
+arithmetic and offline economic checks.
 
-Next: manual contract review, verified fee model and effective fee changes,
+Next: manual contract review, effective fee selection and fill-ledger reconciliation,
 candidate scanning, depth-aware optimisation, streaming/replay, forward testing,
 and eventually a separate execution component. No order-placement functionality
 exists in this starter. Live access and deployment come after account eligibility
@@ -122,8 +135,9 @@ See `docs/SOURCES.md` for official API references and the research reading list.
 
 ## Development checks
 
-GitHub Actions runs offline unit tests, the synthetic demo and inspection of the
-recorded pilot on Python 3.10 and 3.12. It makes no calls to Kalshi. The optional
+GitHub Actions runs offline unit tests, the synthetic demos, explicit fee inputs
+and inspection of the recorded pilot on Python 3.10 and 3.12. It makes no calls
+to Kalshi. The optional
 console command is available after `python3 -m pip install -e .`:
 
 ```bash
