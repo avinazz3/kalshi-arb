@@ -53,8 +53,11 @@ class Client:
                     status, headers = response.status, dict(response.headers)
                     body = response.read()
             except HTTPError as exc:
-                status, headers, body = exc.code, dict(exc.headers), exc.read()
-                error = f"HTTP {status}"
+                try:
+                    status, headers, body = exc.code, dict(exc.headers), exc.read()
+                    error = f"HTTP {status}"
+                finally:
+                    exc.close()
             except (URLError, TimeoutError, OSError) as exc:
                 error = f"{type(exc).__name__}: {exc}"
             received_at = utc_now()

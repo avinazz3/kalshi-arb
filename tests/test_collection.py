@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
@@ -312,12 +313,47 @@ class CollectionTests(unittest.IsolatedAsyncioTestCase):
             finished.set()
             if not signalled: raise RuntimeError('worker was not cancelled')
             raise RequestDeadline('cancelled')
-        with patch('kalshi_lab.collection._discover_archived', side_effect=worker):
+        with self.assertNoLogs('asyncio', level='ERROR'), patch('kalshi_lab.collection._discover_archived', side_effect=worker):
             task = asyncio.create_task(archived_discovery(self.directory, ['BTC'], 100))
             self.assertTrue(await asyncio.to_thread(started.wait, 1))
             task.cancel()
             with self.assertRaises(asyncio.CancelledError): await task
+            await asyncio.sleep(0)  # Drain worker-completion callbacks before checking logs.
         self.assertTrue(finished.is_set())
+
+    async def test_repeated_cancellation_still_waits_for_metadata_worker_cleanup(self):
+        started, stopping, release, finished = Event(), Event(), Event(), Event()
+        def worker(directory, assets, deadline, stop_event):
+            started.set()
+            if not stop_event.wait(2): raise RuntimeError('worker was not cancelled')
+            stopping.set()
+            release.wait(2)
+            finished.set()
+            raise RequestDeadline('cancelled')
+        with self.assertNoLogs('asyncio', level='ERROR'), patch('kalshi_lab.collection._discover_archived', side_effect=worker):
+            task = asyncio.create_task(archived_discovery(self.directory, ['BTC'], 100))
+            try:
+                self.assertTrue(await asyncio.to_thread(started.wait, 1))
+                task.cancel()
+                self.assertTrue(await asyncio.to_thread(stopping.wait, 1))
+                task.cancel()
+                await asyncio.sleep(0)
+                self.assertFalse(task.done())
+            finally:
+                release.set()
+                with self.assertRaises(asyncio.CancelledError): await task
+                await asyncio.sleep(0)
+        self.assertTrue(finished.is_set())
+
+    async def test_metadata_success_and_uncancelled_failure_are_propagated(self):
+        expected = {'metadata': 'ok'}
+        with patch('kalshi_lab.collection._discover_archived', return_value=expected):
+            self.assertIs(await archived_discovery(self.directory, ['BTC'], 100), expected)
+        failure = RequestError('test failure', status=503, retryable=True)
+        with patch('kalshi_lab.collection._discover_archived', side_effect=failure):
+            with self.assertRaises(RequestError) as caught:
+                await archived_discovery(self.directory, ['BTC'], 100)
+        self.assertIs(caught.exception, failure)
 
     async def test_fatal_second_window_keeps_first_window_and_its_quality(self):
         capture = fake_capture(self.clock, self.calls)
@@ -359,7 +395,7 @@ class MetadataBudgetTests(unittest.TestCase):
             with patch('kalshi_lab.client.urlopen', side_effect=[Response({'series': {'ticker': 'KXBTC15M'}}),
                     Response({'markets': [market]}), Response({'event': {'event_ticker': 'EVENT'}})]) as call:
                 result = _discover_archived(directory, ['BTC'], time.monotonic()+5, Event())
-            with sqlite3.connect(directory / 'metadata.sqlite') as db:
+            with closing(sqlite3.connect(directory / 'metadata.sqlite')) as db, db:
                 rows = db.execute('SELECT session,status FROM responses').fetchall()
             self.assertEqual(len(rows), 3)
             self.assertTrue(all(s == result['metadata_session'] and status == 200 for s, status in rows))
@@ -369,11 +405,13 @@ class MetadataBudgetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             store = Store(Path(folder) / 'metadata.sqlite')
             try:
-                with patch('kalshi_lab.client.urlopen', side_effect=HTTPError('x',429,'limit',{'retry-after':'12'},BytesIO(b'limit'))):
+                body = BytesIO(b'limit')
+                with patch('kalshi_lab.client.urlopen', side_effect=HTTPError('x',429,'limit',{'retry-after':'12'},body)):
                     with self.assertRaises(RequestError) as caught: Client(store, retries=0).get('/markets')
                 self.assertEqual(caught.exception.status, 429)
                 self.assertTrue(caught.exception.retryable)
                 self.assertEqual(caught.exception.retry_after, 12)
+                self.assertTrue(body.closed)
             finally: store.close()
 
     def test_collect_cli_missing_credentials_fails_before_creating_directory(self):

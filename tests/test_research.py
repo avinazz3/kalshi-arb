@@ -1,4 +1,5 @@
 from decimal import Decimal as D
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -183,7 +184,7 @@ class DatasetTests(unittest.TestCase):
         create_research_demo(self.path)
 
     def mutate(self, transform):
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             rows = list(db.execute("SELECT id,venue,received_mono_ns,body FROM stream_events WHERE kind='frame' ORDER BY id"))
             for index, venue, timestamp, body in rows:
                 value = transform(venue, timestamp, json.loads(body))
@@ -249,7 +250,7 @@ class DatasetTests(unittest.TestCase):
         self.assertNotEqual(before[1]['targets'], after[1]['targets'])
 
     def test_exact_expiry_boundary_is_rejected(self):
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             config = json.loads(db.execute('SELECT configuration_json FROM sessions').fetchone()[0])
             config['universe']['assets'][0]['market']['close_time'] = '2026-01-01T00:00:07Z'
             db.execute('UPDATE sessions SET configuration_json=?', (json.dumps(config),))
@@ -258,19 +259,19 @@ class DatasetTests(unittest.TestCase):
         self.assertGreater(manifest['rejected_rows']['outside_contract_window'], 0)
 
     def test_tampering_clock_backwards_unfinished_and_wall_jump_fail_closed(self):
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("UPDATE stream_events SET body=? WHERE id=1", (b'{}',))
         with self.assertRaisesRegex(ValueError, 'hash failure'): load_replay(self.path)
         self.path.unlink(); create_research_demo(self.path)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('UPDATE stream_events SET received_mono_ns=0 WHERE id=3')
         with self.assertRaisesRegex(ValueError, 'backwards'): load_replay(self.path)
         self.path.unlink(); create_research_demo(self.path)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("DELETE FROM stream_events WHERE kind='finished'")
         with self.assertRaisesRegex(ValueError, 'finish marker'): build_dataset(self.path)
         self.path.unlink(); create_research_demo(self.path)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('UPDATE stream_events SET received_wall_ns=received_wall_ns+1000000000 WHERE id=3')
         with self.assertRaisesRegex(ValueError, '250ms'): build_dataset(self.path)
 
@@ -283,7 +284,7 @@ class DatasetTests(unittest.TestCase):
 
     def test_btc_and_eth_books_sequences_and_flow_remain_separate(self):
         dual = Path(self.tmp.name) / 'dual.sqlite'
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             config = json.loads(db.execute('SELECT configuration_json FROM sessions').fetchone()[0])
             eth = json.loads(json.dumps(config['universe']['assets'][0]))
             eth.update(asset='ETH', coinbase_product='ETH-USD', series={'ticker': 'KXETH15M'})

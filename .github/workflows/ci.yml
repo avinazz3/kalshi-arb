@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,7 +26,7 @@ jobs:
       - name: Install package
         run: python -m pip install -e '.[stream]'
       - name: Unit tests
-        run: python -m unittest discover -s tests -v
+        run: python tests/run_checks.py
       - name: Synthetic stream capture and inspection
         run: |
           kalshi-lab demo --db data/demo.sqlite
@@ -40,4 +40,4 @@ jobs:
           kalshi-lab research-demo --db data/research_demo.sqlite
           kalshi-lab replay --db data/research_demo.sqlite
           kalshi-lab dataset --db data/research_demo.sqlite --out data/research.jsonl
-          python -c "import json; r=[json.loads(line) for line in open('data/research.jsonl')]; assert len(r)==7; assert r[1]['features']['signed_aggressive_notional_usd']=='25.0100'; assert r[1]['targets']['midpoint_change_1000ms']=='0.0050'"
+          python -c "import json; from pathlib import Path; r=[json.loads(line) for line in Path('data/research.jsonl').read_text().splitlines()]; assert len(r)==7; assert r[1]['features']['signed_aggressive_notional_usd']=='25.0100'; assert r[1]['targets']['midpoint_change_1000ms']=='0.0050'"
