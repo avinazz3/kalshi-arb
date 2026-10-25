@@ -9,6 +9,10 @@ ASSETS = {"BTC": ("KXBTC15M", "BTC-USD"), "ETH": ("KXETH15M", "ETH-USD"),
           "SOL": ("KXSOL15M", "SOL-USD")}
 
 
+class NoActiveMarket(ValueError):
+    pass
+
+
 def parse_time(value):
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
@@ -28,7 +32,7 @@ def select_active(markets, series, now):
         if parse_time(market["open_time"]) <= now < parse_time(market["close_time"]):
             eligible.append(market)
     if not eligible:
-        raise ValueError(f"No active supported $1 market in {series}; rerun discovery in the next window")
+        raise NoActiveMarket(f"No active supported $1 market in {series}; rerun discovery in the next window")
     return min(eligible, key=lambda m: parse_time(m["close_time"]))
 
 

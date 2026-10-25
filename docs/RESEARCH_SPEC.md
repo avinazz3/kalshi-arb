@@ -23,10 +23,14 @@ Raw Kalshi/Coinbase frames remain preserved. The offline layer adds quote histor
 best-level queue imbalance, message-level Coinbase OFI, signed aggressive trade
 notional and 1s/5s future midpoint-change targets. See [DATASET.md](DATASET.md) for
 precise availability, validity and audit rules. There is no estimator or trading
-backtest in this milestone.
+backtest in this milestone. The `collect` coordinator now discovers and records
+successive synchronized 15-minute windows as separate sessions, with metadata,
+quality reports, retry limits and actual coverage/gap reporting. See
+[COLLECTION.md](COLLECTION.md).
 
-Joint capture selects one fixed window per asset and stops before expiry. Automatic
-rollover is a next milestone. A short setup pilot verifies transport only; it does
+The single-window `capture` command stops before expiry. `collect` coordinates
+rollover by starting fresh captures after each expiry; boundary/setup gaps remain.
+A short setup pilot verifies transport only; it does
 not supply a research-quality training/test sample.
 
 ## Protocol details that must survive reconstruction

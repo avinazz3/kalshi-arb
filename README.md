@@ -65,10 +65,29 @@ Use credentials/access permitted for your account and location. Keep private key
 outside the repository. The collector never records auth headers or calls account,
 funding or order-placement endpoints. Do not paste credentials into chat.
 
-**This is a fixed-window pilot.** Joint capture stops at the requested duration
+**The `capture` command is a fixed-window pilot.** Joint capture stops at the requested duration
 or two seconds before the earliest selected contract closes, whichever is sooner.
 It does not rotate into the next 15-minute market. Rerun discovery before another
-window. Coinbase-only mode can run longer (up to one hour per invocation).
+single-window pilot. Coinbase-only mode can run longer (up to one hour per invocation).
+
+## Collect successive windows
+
+With those local credentials configured, start a bounded run in a new directory:
+
+```bash
+python3 -m kalshi_lab collect --assets BTC ETH --seconds 3600 --run-dir data/runs/pilot-001
+```
+
+The coordinator discovers active contracts, records each window into its own
+capture session/database, waits through expiry and discovers the next contracts.
+`run.json` checkpoints per-window mappings, statuses, actual frame coverage and
+gaps. Metadata responses and failed attempts are retained. It skips near-expiry
+windows, retries temporary metadata outages and stops on authentication/storage
+failures. Existing run directories are preserved; use a new path for another run.
+
+Rollover reconnects both feeds, so there are explicit boundary/setup gaps. Every
+dataset stays within its own session and contract window. See [COLLECTION.md](docs/COLLECTION.md)
+for retry/deadline behavior, verification tests and batch dataset export.
 
 ## What the recorder preserves
 
@@ -133,7 +152,7 @@ executable-profit estimates are not implemented yet.
 ## What follows this milestone
 
 Read [the experiment specification](docs/RESEARCH_SPEC.md) before collecting a
-research sample. Next come market-window rotation, the remaining price controls,
+research sample. Next come supervised joint collection, the remaining price controls,
 baseline forecasts and chronological evaluation. Economic replay and supervised
 live execution follow only if warranted.
 

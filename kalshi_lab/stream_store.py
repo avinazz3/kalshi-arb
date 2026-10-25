@@ -110,7 +110,8 @@ def inspect_stream(path, session=None):
                 "kalshi_snapshots": 0, "coinbase_snapshots": 0, "server_errors": 0,
                 "kalshi_market_snapshots": {}, "coinbase_product_snapshots": {},
                 "connection_events": {}, "message_types": {}, "session_status": "no_finish_record",
-                "venue_first_frame_wall_ns": {}, "venue_last_frame_wall_ns": {}})
+                "venue_first_frame_wall_ns": {}, "venue_last_frame_wall_ns": {},
+                "venue_first_frame_mono_ns": {}, "venue_last_frame_mono_ns": {}})
             info["last_wall_ns"] = row["received_wall_ns"]
             info["venues"][row["venue"]] = info["venues"].get(row["venue"], 0) + int(row["kind"] == "frame")
             report["body_hash_failures"] += int(hashlib.sha256(row["body"]).hexdigest() != row["sha256"])
@@ -125,6 +126,8 @@ def inspect_stream(path, session=None):
                 continue
             info["venue_first_frame_wall_ns"].setdefault(row["venue"], row["received_wall_ns"])
             info["venue_last_frame_wall_ns"][row["venue"]] = row["received_wall_ns"]
+            info["venue_first_frame_mono_ns"].setdefault(row["venue"], row["received_mono_ns"])
+            info["venue_last_frame_mono_ns"][row["venue"]] = row["received_mono_ns"]
             try:
                 data = json.loads(row["body"])
                 if not isinstance(data, dict):
