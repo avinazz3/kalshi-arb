@@ -7,8 +7,12 @@ import unittest
 
 from kalshi_lab.fees import (
     FeePolicy, Fill, OrderFeeAccumulator, calculate_order, calculate_orders,
-    synthetic_pair_document,
 )
+
+
+def example_document():
+    path = Path(__file__).resolve().parents[1] / 'examples' / 'fee_orders.json'
+    return json.loads(path.read_text())
 
 
 class RoundingTests(unittest.TestCase):
@@ -136,20 +140,20 @@ class PolicyAndOrderTests(unittest.TestCase):
 
 
 class FeeInputAndDemoTests(unittest.TestCase):
-    def test_synthetic_pair_net_surplus_at_both_precisions(self):
-        for precision, expected_fee, expected_surplus in [
-            ('.0001', '.2778', '.0422'), ('.01', '.28', '.04')]:
+    def test_hypothetical_round_trip_at_both_precisions(self):
+        for precision, expected_fee, expected_cash in [
+            ('.0001', '.2778', '.3622'), ('.01', '.28', '.36')]:
             with self.subTest(precision=precision):
-                result = calculate_orders(synthetic_pair_document(), precision)
+                result = calculate_orders(example_document(), precision)
                 self.assertEqual(result['total_fee_dollars'], D(expected_fee))
-                self.assertEqual(D('8') + result['total_cash_change_dollars'], D(expected_surplus))
+                self.assertEqual(result['total_cash_change_dollars'], D(expected_cash))
 
     def test_duplicate_order_ids_and_missing_configuration_fail(self):
-        duplicate = synthetic_pair_document()
+        duplicate = example_document()
         duplicate['orders'][1]['order_id'] = duplicate['orders'][0]['order_id']
         with self.assertRaises(ValueError):
             calculate_orders(duplicate, '.01')
-        missing = synthetic_pair_document()
+        missing = example_document()
         del missing['policy']['maker_multiplier']
         with self.assertRaises(TypeError):
             calculate_orders(missing, '.01')
@@ -161,14 +165,10 @@ class FeeInputAndDemoTests(unittest.TestCase):
             with self.subTest(document=document), self.assertRaises((ValueError, TypeError)):
                 calculate_orders(document, '.01')
         for fills in [None, {}, [None]]:
-            document = synthetic_pair_document()
+            document = example_document()
             document['orders'][0]['fills'] = fills
             with self.subTest(fills=fills), self.assertRaises(ValueError):
                 calculate_orders(document, '.01')
-
-    def test_example_file_matches_documented_synthetic_input(self):
-        path = Path(__file__).resolve().parents[1] / 'examples' / 'fee_orders.json'
-        self.assertEqual(json.loads(path.read_text()), synthetic_pair_document())
 
     def test_cli_explicit_input(self):
         root = Path(__file__).resolve().parents[1]
@@ -177,16 +177,6 @@ class FeeInputAndDemoTests(unittest.TestCase):
                                 cwd=root, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(D(json.loads(result.stdout)['total_fee_dollars']), D('.2778'))
-
-    def test_demo_marks_synthetic_assumptions(self):
-        root = Path(__file__).resolve().parents[1]
-        result = subprocess.run([sys.executable, '-m', 'kalshi_lab', 'fee-demo'], cwd=root,
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        output = json.loads(result.stdout)
-        self.assertTrue(output['synthetic_example'])
-        self.assertEqual([D(s['surplus_after_modelled_fees_dollars']) for s in output['scenarios']],
-                         [D('.0422'), D('.04')])
 
 
 if __name__ == '__main__':

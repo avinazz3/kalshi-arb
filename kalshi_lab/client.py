@@ -27,7 +27,7 @@ class Client:
             requested_at, start = utc_now(), time.monotonic()
             status, body, headers, error = None, b"", {}, None
             try:
-                req = Request(url, headers={"Accept": "application/json", "User-Agent": "kalshi-arbitrage-lab/0.1"}, method="GET")
+                req = Request(url, headers={"Accept": "application/json", "User-Agent": "kalshi-crypto-flow/0.2"}, method="GET")
                 with urlopen(req, timeout=self.timeout) as response:
                     status, headers = response.status, dict(response.headers)
                     body = response.read()

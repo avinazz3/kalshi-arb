@@ -6,15 +6,15 @@
   },
   "orders": [
     {
-      "order_id": "lower_threshold_yes",
+      "order_id": "hypothetical_yes_entry",
       "fills": [
         {"price_dollars": "0.44", "quantity": "8", "liquidity": "taker", "direction": "buy"}
       ]
     },
     {
-      "order_id": "higher_threshold_no",
+      "order_id": "hypothetical_yes_exit",
       "fills": [
-        {"price_dollars": "0.52", "quantity": "8", "liquidity": "taker", "direction": "buy"}
+        {"price_dollars": "0.52", "quantity": "8", "liquidity": "taker", "direction": "sell"}
       ]
     }
   ]

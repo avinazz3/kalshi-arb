@@ -1,19 +1,18 @@
+"""Crypto discovery, raw capture and fee accounting commands."""
 import argparse
-from datetime import datetime
-from decimal import Decimal
+import asyncio
+from decimal import DecimalException
 import json
 from pathlib import Path
 import sqlite3
-import statistics
 import sys
-import time
-from urllib.parse import quote
 
-from .books import asks, bids, threshold_pair_quote
-from .client import Client, utc_now
-from .discovery import candidates, choose_watchlist
-from .fees import calculate_orders, synthetic_pair_document
+from .client import Client
+from .demo import create_demo
+from .discovery import ASSETS, discover
+from .fees import calculate_orders
 from .storage import Store
+from .stream_store import inspect_stream
 
 
 def dump(value):
@@ -25,211 +24,62 @@ def write_json(path, value):
     Path(path).write_text(dump(value) + "\n", encoding="utf-8")
 
 
-def discover(args):
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    store = Store(out / "requests.sqlite")
-    try:
-        client = Client(store)
-        series = client.get(f"/series/{quote(args.series, safe='')}", ticker=args.series)
-        pages, markets, cursor = [], {}, ""
-        for _ in range(args.max_pages):
-            params = {"series_ticker": args.series, "status": "open", "limit": 200, "mve_filter": "exclude"}
-            if cursor:
-                params["cursor"] = cursor
-            page = client.get("/markets", params)
-            pages.append(page)
-            for market in page["markets"]:
-                markets[market["ticker"]] = market
-            cursor = page.get("cursor", "")
-            if not cursor:
-                break
-            time.sleep(0.25)
-        manifest = {"retrieved_at": utc_now(), "series": series, "markets": list(markets.values()),
-                    "pagination_complete": not bool(cursor), "remaining_cursor": cursor,
-                    "pages_retrieved": len(pages), "session": client.session}
-        write_json(out / "markets.json", manifest)
-        proposals = candidates(manifest["markets"])
-        write_json(out / "relation_candidates.json", proposals)
-        watchlist = choose_watchlist(manifest["markets"], args.max_markets, args.event)
-        watchlist["series_ticker"] = args.series
-        event = client.get(f"/events/{quote(watchlist['event_ticker'], safe='')}", ticker=watchlist["event_ticker"])
-        write_json(out / "selected_event.json", event)
-        write_json(out / "watchlist.json", watchlist)
-        print(dump({"markets_found": len(markets), "pagination_complete": not bool(cursor),
-                    "unreviewed_adjacent_pairs": len(proposals), "watchlist": watchlist,
-                    "output_directory": str(out)}))
-    finally:
-        store.close()
-
-
-def collect(args):
-    watch = json.loads(Path(args.watchlist).read_text())
-    tickers = list(dict.fromkeys(watch["tickers"]))
-    if not tickers or len(tickers) > 12 or not all(isinstance(t, str) and t for t in tickers):
-        raise ValueError("Use a watchlist of 1-12 nonempty tickers")
-    store = Store(args.db)
-    successful, failed = 0, 0
-    try:
-        client = Client(store)
-        # Every run archives its own rule/fee metadata, not just the old watchlist.
-        if watch.get("series_ticker"):
-            client.get(f"/series/{quote(watch['series_ticker'], safe='')}", ticker=watch["series_ticker"])
-        if watch.get("event_ticker"):
-            client.get(f"/events/{quote(watch['event_ticker'], safe='')}", ticker=watch["event_ticker"])
-        for ticker in tickers:
-            client.get(f"/markets/{quote(ticker, safe='')}", ticker=ticker)
-        sweep = 0
-        while args.sweeps == 0 or sweep < args.sweeps:
-            sweep += 1
-            started = time.monotonic()
-            for ticker in tickers:
-                try:
-                    payload = client.get(f"/markets/{quote(ticker, safe='')}/orderbook",
-                                         kind="orderbook", ticker=ticker, sweep=sweep)
-                    bids(payload, "yes")
-                    bids(payload, "no")
-                    successful += 1
-                except (RuntimeError, ValueError, KeyError, TypeError) as exc:
-                    failed += 1
-                    print(f"{utc_now()} sweep={sweep} ticker={ticker} ERROR {exc}", file=sys.stderr)
-                time.sleep(0.25)
-            print(dump({"session": client.session, "sweep": sweep,
-                        "valid_books_total": successful, "failed_books_total": failed,
-                        "sweep_duration_seconds": round(time.monotonic() - started, 3)}), flush=True)
-            if args.sweeps == 0 or sweep < args.sweeps:
-                time.sleep(max(0, args.interval - (time.monotonic() - started)))
-    except KeyboardInterrupt:
-        print("Stopped; committed responses remain on disk.")
-    finally:
-        store.close()
-    if successful == 0:
-        raise RuntimeError("No valid orderbooks collected")
-
-
-def inspect(args):
-    # mode=ro avoids creating an empty database on a typo.
-    db = sqlite3.connect(Path(args.db).resolve().as_uri() + "?mode=ro", uri=True)
-    db.row_factory = sqlite3.Row
-    result, durations, spans = {}, [], {}
-    try:
-        for row in db.execute("SELECT * FROM responses ORDER BY id"):
-            if row["kind"] != "orderbook":
-                continue
-            ticker = row["ticker"]
-            info = result.setdefault(ticker, {"http_attempts": 0, "valid_books": 0, "invalid_or_failed": 0,
-                "empty_yes_bid_books": 0, "empty_no_bid_books": 0, "first_received_at": None,
-                "last_received_at": None, "latest_yes_ask": None, "latest_no_ask": None})
-            info["http_attempts"] += 1
-            if row["status"] != 200 or row["error"]:
-                info["invalid_or_failed"] += 1
-                continue
-            try:
-                payload = json.loads(row["body"], parse_float=str)
-                yes, no = bids(payload, "yes"), bids(payload, "no")
-            except (ValueError, TypeError, KeyError):
-                info["invalid_or_failed"] += 1
-                continue
-            info["valid_books"] += 1
-            info["empty_yes_bid_books"] += int(not yes)
-            info["empty_no_bid_books"] += int(not no)
-            info["first_received_at"] = info["first_received_at"] or row["received_at"]
-            info["last_received_at"] = row["received_at"]
-            info["latest_yes_ask"] = str(asks(payload, "yes")[0][0]) if no else None
-            info["latest_no_ask"] = str(asks(payload, "no")[0][0]) if yes else None
-            durations.append(row["duration_ms"])
-            key = (row["session"], row["sweep"])
-            spans.setdefault(key, []).append(datetime.fromisoformat(row["received_at"]))
-        max_span = max(((max(v) - min(v)).total_seconds() for v in spans.values()), default=None)
-        report = {"generated_at": utc_now(), "markets": result,
-                  "median_successful_request_ms": statistics.median(durations) if durations else None,
-                  "maximum_observed_sweep_receipt_span_seconds": max_span,
-                  "interpretation": "REST samples are asynchronous; receipt spans are not exchange-clock latency or opportunity duration. No fees or net opportunities estimated."}
-        if args.out:
-            write_json(args.out, report)
-        print(dump(report))
-    finally:
-        db.close()
-
-
-def demo(_args):
-    lower = {"orderbook_fp": {"yes_dollars": [], "no_dollars": [["0.5600", "20.00"]]}}
-    higher = {"orderbook_fp": {"yes_dollars": [["0.4800", "8.00"], ["0.4300", "30.00"]], "no_dollars": []}}
-    print("SYNTHETIC EXAMPLE. Assumes strict nested thresholds and ordinary binary settlement.")
-    print(dump({"eight_pairs": threshold_pair_quote(lower, higher, "8", "0.20"),
-                "twenty_pairs": threshold_pair_quote(lower, higher, "20"),
-                "fee_reserve_note": "$0.20 is an invented total reserve for the 8-pair example; it is not a Kalshi fee estimate."}))
-
-
-def positive_int(value):
-    number = int(value)
-    if number < 1:
-        raise argparse.ArgumentTypeError("Must be >=1")
-    return number
-
-
-def fees(args):
-    document = json.loads(Path(args.input).read_text(encoding="utf-8"), parse_float=str)
-    result = calculate_orders(document, args.balance_precision)
-    if args.out:
-        write_json(args.out, result)
-    print(dump(result))
-
-
-def fee_demo(_args):
-    scenarios = []
-    for precision in ("0.0001", "0.01"):
-        result = calculate_orders(synthetic_pair_document(), precision)
-        # Only this synthetic example assumes q=8 and ordinary nested binary payout.
-        result["minimum_normal_settlement_dollars"] = Decimal("8")
-        result["gross_surplus_dollars"] = Decimal("0.32")
-        result["surplus_after_modelled_fees_dollars"] = Decimal("8") + result["total_cash_change_dollars"]
-        scenarios.append(result)
-    print(dump({
-        "synthetic_example": True,
-        "assumptions": "Two separate one-fill taker orders, supplied multiplier 1, ordinary binary settlement; not live quotes or account-reconciled fees.",
-        "scenarios": scenarios,
-    }))
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Kalshi research starter: public GET-only collection and exact payoff examples")
+    parser = argparse.ArgumentParser(description="Crypto Flow Lab: read-only research data and fee accounting")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("demo", help="Offline synthetic depth/payoff example").set_defaults(run=demo)
-    sub.add_parser("fee-demo", help="Synthetic pair under both documented balance precisions").set_defaults(run=fee_demo)
-    p = sub.add_parser("fees", help="Calculate modelled fees for explicit policy and ordered fills")
-    p.add_argument("--input", required=True, help="JSON file containing policy and orders")
-    p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"), help="Account precision in dollars; never inferred")
-    p.add_argument("--out", help="Optional JSON report path")
-    p.set_defaults(run=fees)
-    p = sub.add_parser("discover", help="Retrieve series, markets and unreviewed threshold proposals")
-    p.add_argument("--series", default="KXCPI")
-    p.add_argument("--event", help="Optional exact event ticker; otherwise choose by retrieved volume")
-    p.add_argument("--max-pages", type=positive_int, default=10)
-    p.add_argument("--max-markets", type=positive_int, default=4)
-    p.add_argument("--out", default="data/discovery")
-    p.set_defaults(run=discover)
-    p = sub.add_parser("collect", help="Sample public REST books; --sweeps 0 runs until Ctrl+C")
-    p.add_argument("--watchlist", default="data/discovery/watchlist.json")
-    p.add_argument("--db", default="data/orderbooks.sqlite")
-    p.add_argument("--interval", type=float, default=5)
-    p.add_argument("--sweeps", type=int, default=12)
-    p.set_defaults(run=collect)
-    p = sub.add_parser("inspect", help="Report capture quality and latest implied asks")
-    p.add_argument("--db", default="data/orderbooks.sqlite")
+    p = sub.add_parser("discover", help="Archive current crypto series/event/market metadata")
+    p.add_argument("--assets", nargs="+", choices=tuple(ASSETS), default=["BTC", "ETH"])
+    p.add_argument("--out", default="data/universe.json")
+    p.add_argument("--db", default="data/metadata.sqlite")
+    p = sub.add_parser("capture", help="Record shared-clock WebSocket frames for one market window")
+    p.add_argument("--universe", default="data/universe.json")
+    p.add_argument("--db", default="data/capture.sqlite")
+    p.add_argument("--seconds", type=int, default=60)
+    p.add_argument("--reference-only", action="store_true", help="Public Coinbase-only setup test; cannot evaluate cross-venue signals")
+    p.add_argument("--assets", nargs="+", choices=tuple(ASSETS), help="Asset override for reference-only mode")
+    p = sub.add_parser("inspect", help="Verify raw stream hashes, counts and sequence continuity")
+    p.add_argument("--db", default="data/capture.sqlite")
     p.add_argument("--out")
-    p.set_defaults(run=inspect)
+    p = sub.add_parser("demo", help="Create and inspect a small synthetic stream fixture")
+    p.add_argument("--db", default="data/demo.sqlite")
+    p = sub.add_parser("fees", help="Calculate fees from explicit policy and ordered fills")
+    p.add_argument("--input", required=True)
+    p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"))
+    p.add_argument("--out")
     args = parser.parse_args()
-    if args.command == "collect" and (args.sweeps < 0 or not 1 <= args.interval <= 3600):
-        parser.error("Use --sweeps >=0 and --interval between 1 and 3600 seconds")
-    if args.command == "discover" and args.max_markets > 12:
-        parser.error("Use --max-markets <=12 for this starter")
     try:
-        args.run(args)
-    except (OSError, RuntimeError, ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+        if args.command == "discover":
+            store = Store(args.db)
+            try:
+                result = discover(Client(store), args.assets)
+            finally:
+                store.close()
+            write_json(args.out, result)
+            result = {"manifest": args.out, "assets": [
+                {"asset": r["asset"], "market": r["market"]["ticker"], "close_time": r["market"]["close_time"]}
+                for r in result["assets"]]}
+        elif args.command == "capture":
+            from .capture import run_capture
+            universe = None if args.reference_only else json.loads(Path(args.universe).read_text())
+            result = asyncio.run(run_capture(args.db, args.seconds, universe=universe,
+                                 reference_only=args.reference_only, assets=args.assets))
+        elif args.command == "inspect":
+            result = inspect_stream(args.db)
+        elif args.command == "demo":
+            result = create_demo(args.db)
+        else:
+            document = json.loads(Path(args.input).read_text(), parse_float=str)
+            result = calculate_orders(document, args.balance_precision)
+        if getattr(args, "out", None) and args.command != "discover":
+            write_json(args.out, result)
+        print(dump(result))
+        return 0
+    except KeyboardInterrupt:
+        print("Stopped; committed raw data remains available.", file=sys.stderr)
+        return 130
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError, sqlite3.Error, DecimalException) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    return 0
 
 
 if __name__ == "__main__":
