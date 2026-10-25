@@ -35,3 +35,9 @@ jobs:
         run: |
           kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.0001
           kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.01
+      - name: Hand-checkable research dataset
+        run: |
+          kalshi-lab research-demo --db data/research_demo.sqlite
+          kalshi-lab replay --db data/research_demo.sqlite
+          kalshi-lab dataset --db data/research_demo.sqlite --out data/research.jsonl
+          python -c "import json; r=[json.loads(line) for line in open('data/research.jsonl')]; assert len(r)==7; assert r[1]['features']['signed_aggressive_notional_usd']=='25.0100'; assert r[1]['targets']['midpoint_change_1000ms']=='0.0050'"

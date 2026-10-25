@@ -4,7 +4,8 @@
 Kalshi binary-contract price changes, beyond prices, volatility and time to expiry?
 
 The first assets are BTC and ETH; SOL is available as an explicit extension.
-This milestone implements discovery, raw WebSocket capture and integrity checks.
+This milestone implements discovery, raw WebSocket capture, integrity checks,
+book reconstruction and receipt-time research datasets.
 It does not fit a forecasting model or claim an executable trading edge.
 
 ## Setup and offline verification
@@ -102,12 +103,39 @@ by a sale at $0.52. Its explicit fee policy produces $0.2778 in modelled fees an
 a $0.3622 net cash change. No such trade has been observed or executed.
 See [the fee model](docs/FEE_MODEL.md) for rounding and configuration limits.
 
+## Reconstruct books and build features/labels
+
+First run a hand-checkable synthetic experiment without credentials:
+
+```bash
+python3 -m kalshi_lab research-demo --db data/research_demo.sqlite
+python3 -m kalshi_lab replay --db data/research_demo.sqlite
+python3 -m kalshi_lab dataset --db data/research_demo.sqlite --out data/research.jsonl
+```
+
+Expect seven rows. At the 2s decision, aggressive notional over the previous second
+is +$25.01, message-level Coinbase OFI is +2 units, and the next 1s Kalshi midpoint
+change is +$0.005. These are invented events with known answers, not trading results.
+
+On a completed joint live capture, replace the database path above with
+`data/capture.sqlite`. Use `--session ID` if it contains multiple sessions.
+The dataset command writes JSONL with separate feature/target objects and a
+`.manifest.json` sidecar containing hashes, settings and rejection counts.
+Existing dataset outputs are never overwritten. A reference-only capture can
+be replayed but cannot produce this joint dataset.
+
+Defaults use a 1s decision grid/lookback and 1s/5s future midpoint-change targets.
+Broken sequences, reconnects, invalid books, insufficient feed activity and
+expiry-crossing rows are rejected. Read [DATASET.md](docs/DATASET.md) for exact
+definitions, limitations and a manual verification example. Forecasts and
+executable-profit estimates are not implemented yet.
+
 ## What follows this milestone
 
 Read [the experiment specification](docs/RESEARCH_SPEC.md) before collecting a
-research sample. Next come snapshot/delta reconstruction, market-window rotation,
-leakage-controlled feature/label construction, baseline forecasts and chronological
-evaluation. Economic replay and supervised live execution follow only if warranted.
+research sample. Next come market-window rotation, the remaining price controls,
+baseline forecasts and chronological evaluation. Economic replay and supervised
+live execution follow only if warranted.
 
 The earlier CPI arbitrage experiment, relation proposals and recorded CPI sample
 were removed from the active tree. Git history retains that work. The distribution
@@ -115,5 +143,5 @@ is now `kalshi-crypto-flow`; the `kalshi_lab` import and `kalshi-lab` console co
 remain stable. Existing old capture databases are not stream datasets.
 
 GitHub Actions installs the streaming extra and runs offline tests, synthetic
-capture/inspection and fee examples on Python 3.10 and 3.12. No live service or
+capture/inspection, hand-checkable research datasets and fee examples on Python 3.10 and 3.12. No live service or
 credentials are required by CI. Official references are in [SOURCES.md](docs/SOURCES.md).

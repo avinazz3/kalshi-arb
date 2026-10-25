@@ -17,10 +17,13 @@ future quote movements is a proposed extension, not a demonstrated alpha source.
 
 ## Implemented milestone
 
-Explicit crypto-series discovery, raw shared-clock WebSocket capture and integrity
-reports. Kalshi orderbook snapshots/deltas and Coinbase level2/market_trades are
-preserved without transformation. There is no reconstructed-book engine, feature
-dataset, estimator or trading backtest in this milestone.
+Explicit crypto-series discovery, raw shared-clock WebSocket capture, integrity
+reports, exact snapshot/delta reconstruction and as-of feature/label datasets.
+Raw Kalshi/Coinbase frames remain preserved. The offline layer adds quote history,
+best-level queue imbalance, message-level Coinbase OFI, signed aggressive trade
+notional and 1s/5s future midpoint-change targets. See [DATASET.md](DATASET.md) for
+precise availability, validity and audit rules. There is no estimator or trading
+backtest in this milestone.
 
 Joint capture selects one fixed window per asset and stops before expiry. Automatic
 rollover is a next milestone. A short setup pilot verifies transport only; it does
@@ -65,7 +68,10 @@ Features to pre-specify:
   imbalance as distinct feature groups.
 - Each feature's lookback and availability rule, including delayed batched trades.
 
-This milestone records the necessary inputs but does not implement these rules.
+The current dataset implements receipt-time alignment, contract-window bounds,
+continuity checks and the core own-asset flow features. Volatility, verified
+strike/reference distance, cross-asset features and full M1/M2 comparisons remain
+to be implemented. The existing feature set is not the full price-only baseline.
 
 ## Planned model comparison
 

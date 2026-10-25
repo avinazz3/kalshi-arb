@@ -1,4 +1,4 @@
-"""Crypto discovery, raw capture and fee accounting commands."""
+"""Crypto capture, reconstruction, research datasets and fee accounting."""
 import argparse
 import asyncio
 from decimal import DecimalException
@@ -42,12 +42,29 @@ def main():
     p.add_argument("--out")
     p = sub.add_parser("demo", help="Create and inspect a small synthetic stream fixture")
     p.add_argument("--db", default="data/demo.sqlite")
+    p = sub.add_parser("research-demo", help="Create a synthetic, hand-checkable research capture")
+    p.add_argument("--db", default="data/research_demo.sqlite")
+    p = sub.add_parser("replay", help="Reconstruct books and report invalid states")
+    p.add_argument("--db", default="data/capture.sqlite")
+    p.add_argument("--session")
+    p.add_argument("--out")
+    p = sub.add_parser("dataset", help="Export as-of features, future quote labels and an audit manifest")
+    p.add_argument("--db", default="data/capture.sqlite")
+    p.add_argument("--session")
+    p.add_argument("--out", default="data/research.jsonl")
+    p.add_argument("--grid-ms", type=int, default=1000)
+    p.add_argument("--lookback-ms", type=int, default=1000)
+    p.add_argument("--horizons-ms", nargs="+", type=int, default=[1000, 5000])
+    p.add_argument("--max-silence-ms", type=int, default=5000)
     p = sub.add_parser("fees", help="Calculate fees from explicit policy and ordered fills")
     p.add_argument("--input", required=True)
     p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"))
     p.add_argument("--out")
     args = parser.parse_args()
     try:
+        if (getattr(args, "out", None) and getattr(args, "db", None)
+                and Path(args.out).resolve() == Path(args.db).resolve()):
+            raise ValueError("Output must differ from raw database")
         if args.command == "discover":
             store = Store(args.db)
             try:
@@ -67,10 +84,21 @@ def main():
             result = inspect_stream(args.db)
         elif args.command == "demo":
             result = create_demo(args.db)
+        elif args.command == "research-demo":
+            from .research_demo import create_research_demo
+            result = create_research_demo(args.db)
+        elif args.command == "replay":
+            from .replay import load_replay
+            result = load_replay(args.db, args.session).report()
+        elif args.command == "dataset":
+            from .dataset import export_dataset
+            result = export_dataset(args.db, args.out, session=args.session,
+                grid_ms=args.grid_ms, lookback_ms=args.lookback_ms,
+                horizons_ms=args.horizons_ms, max_silence_ms=args.max_silence_ms)
         else:
             document = json.loads(Path(args.input).read_text(), parse_float=str)
             result = calculate_orders(document, args.balance_precision)
-        if getattr(args, "out", None) and args.command != "discover":
+        if getattr(args, "out", None) and args.command not in ("discover", "dataset"):
             write_json(args.out, result)
         print(dump(result))
         return 0
