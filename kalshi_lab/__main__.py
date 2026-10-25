@@ -37,6 +37,13 @@ def main():
     p.add_argument("--seconds", type=int, default=60)
     p.add_argument("--reference-only", action="store_true", help="Public Coinbase-only setup test; cannot evaluate cross-venue signals")
     p.add_argument("--assets", nargs="+", choices=tuple(ASSETS), help="Asset override for reference-only mode")
+    p = sub.add_parser("collect", help="Discover and record successive contract windows into a new run directory")
+    p.add_argument("--run-dir", required=True)
+    p.add_argument("--seconds", type=int, default=3600)
+    p.add_argument("--assets", nargs="+", choices=tuple(ASSETS), default=["BTC", "ETH"])
+    p.add_argument("--retry-seconds", type=int, default=5)
+    p.add_argument("--minimum-window-seconds", type=int, default=30)
+    p.add_argument("--max-discovery-failures", type=int, default=5)
     p = sub.add_parser("inspect", help="Verify raw stream hashes, counts and sequence continuity")
     p.add_argument("--db", default="data/capture.sqlite")
     p.add_argument("--out")
@@ -80,6 +87,11 @@ def main():
             universe = None if args.reference_only else json.loads(Path(args.universe).read_text())
             result = asyncio.run(run_capture(args.db, args.seconds, universe=universe,
                                  reference_only=args.reference_only, assets=args.assets))
+        elif args.command == "collect":
+            from .collection import run_collection
+            result = asyncio.run(run_collection(args.run_dir, args.seconds, assets=args.assets,
+                retry_seconds=args.retry_seconds, minimum_window_seconds=args.minimum_window_seconds,
+                max_discovery_failures=args.max_discovery_failures))
         elif args.command == "inspect":
             result = inspect_stream(args.db)
         elif args.command == "demo":

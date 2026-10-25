@@ -40,8 +40,9 @@ python3 -m kalshi_lab dataset --db data/capture.sqlite --out data/research.jsonl
 ```
 
 If the database contains multiple sessions, supply `--session SESSION_ID` to both
-commands. Sessions have different monotonic clock origins; the builder never
-joins them. Reference-only captures can be replayed but cannot generate this
+commands. Session clocks are not assumed comparable; the builder never joins
+them. The rollover report compares frame gaps within one process/run only.
+Reference-only captures can be replayed but cannot generate this
 cross-venue dataset. Inspect zero-row exports and rejection counts before doing
 any modelling. An accepted row is not certification that a sample is representative.
 
@@ -169,8 +170,8 @@ report zero accepted rows. Inputs and existing dataset outputs are preserved.
 ## Next experiment
 
 Collect multiple complete contract windows and inspect reconstruction/coverage
-before building chronological splits. Automatic window rotation remains a separate
-recorder milestone. Then add the missing price controls and compare transparent
+before building chronological splits. The [collection coordinator](COLLECTION.md)
+handles window rotation with explicit gaps and separate sessions. Then add the missing price controls and compare transparent
 regularized forecasts against no-change and price-only baselines, with purged
 calendar splits and block-level uncertainty. A costed executable-price replay
 comes after predictive evaluation. This dataset alone is evidence about neither

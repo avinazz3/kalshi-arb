@@ -15,6 +15,35 @@ COINBASE_WS = "wss://advanced-trade-ws.coinbase.com"
 KALSHI_WS = "wss://external-api-ws.kalshi.com/trade-api/ws/v2"
 
 
+class AuthenticationRejected(RuntimeError):
+    pass
+
+
+class CaptureIncomplete(RuntimeError):
+    def __init__(self, session, quality):
+        super().__init__("Missing required book snapshots; inspect the retained capture for connection/subscription failures")
+        self.session, self.quality = session, quality
+
+
+def load_kalshi_auth():
+    """Preflight local credentials without writing them to any artifact."""
+    key_id, key_path = os.environ.get("KALSHI_API_KEY_ID"), os.environ.get("KALSHI_PRIVATE_KEY_PATH")
+    if not key_id or not key_path:
+        raise ValueError("Joint streaming requires local KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH; reference-only needs neither")
+    try:
+        import websockets  # noqa: F401
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    except ImportError as exc:
+        raise RuntimeError("Install the [stream] optional dependencies") from exc
+    try:
+        private_key = load_pem_private_key(Path(key_path).read_bytes(), password=None)
+    except (OSError, ValueError, TypeError):
+        raise ValueError("Could not load the local Kalshi key; check its path and PEM format") from None
+    auth = lambda: kalshi_headers(key_id, private_key)
+    auth()
+    return auth
+
+
 def kalshi_headers(key_id, private_key, timestamp_ms=None):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding, rsa, ed25519
@@ -64,7 +93,7 @@ async def collect_feed(spec, writer, auth=None):
             writer.record(spec["venue"], connection, "disconnected", json.dumps(
                 {"error_type": type(exc).__name__, "http_status": status}))
             if status in (401, 403):
-                raise RuntimeError(f"{spec['venue']} authentication/access rejected (HTTP {status})") from None
+                raise AuthenticationRejected(f"{spec['venue']} authentication/access rejected (HTTP {status})") from None
         else:
             writer.record(spec["venue"], connection, "disconnected", '{"reason":"remote_close"}')
         retry += 1
@@ -93,16 +122,7 @@ async def run_capture(path, seconds, *, universe=None, reference_only=False, ass
         if duration < 1:
             raise ValueError("Manifest expired or too close to expiry; rerun discover")
         assets, tickers = [r["asset"] for r in records], [r["market"]["ticker"] for r in records]
-        key_id, key_path = os.environ.get("KALSHI_API_KEY_ID"), os.environ.get("KALSHI_PRIVATE_KEY_PATH")
-        if not key_id or not key_path:
-            raise ValueError("Joint streaming requires local KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH; reference-only needs neither")
-        try:
-            from cryptography.hazmat.primitives.serialization import load_pem_private_key
-        except ImportError as exc:
-            raise RuntimeError("Install the [stream] optional dependencies") from exc
-        private_key = load_pem_private_key(Path(key_path).read_bytes(), password=None)
-        auth = lambda: kalshi_headers(key_id, private_key)
-        auth()  # Validate the key before connecting either feed. Do not store headers.
+        auth = load_kalshi_auth()
     session = uuid4().hex
     configuration = {"assets": assets, "reference_only": reference_only,
                      "requested_seconds": seconds, "planned_seconds": duration, "universe": universe}
@@ -129,5 +149,5 @@ async def run_capture(path, seconds, *, universe=None, reference_only=False, ass
     missing_products = set(ASSETS[a][1] for a in assets) - set(info.get("coinbase_product_snapshots", {}))
     missing_markets = set(tickers) - set(info.get("kalshi_market_snapshots", {}))
     if missing_products or missing_markets:
-        raise RuntimeError("Missing required book snapshots; inspect the retained capture for connection/subscription failures")
+        raise CaptureIncomplete(session, report)
     return {"session": session, "quality": report}
