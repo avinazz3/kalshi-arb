@@ -24,15 +24,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package
-        run: python -m pip install -e .
+        run: python -m pip install -e '.[stream]'
       - name: Unit tests
         run: python -m unittest discover -s tests -v
-      - name: Synthetic payoff example
-        run: kalshi-lab demo
-      - name: Fee scenarios and explicit JSON input
+      - name: Synthetic stream capture and inspection
         run: |
-          kalshi-lab fee-demo
+          kalshi-lab demo --db data/demo.sqlite
+          kalshi-lab inspect --db data/demo.sqlite
+      - name: Hypothetical entry and exit fees
+        run: |
           kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.0001
           kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.01
-      - name: Inspect recorded public-data pilot
-        run: python -m kalshi_lab inspect --db examples/pilot/orderbooks.sqlite

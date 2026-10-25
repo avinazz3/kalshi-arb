@@ -3,6 +3,10 @@ __pycache__/
 .venv/
 data/
 *.pem
+*.key
+*.sqlite
+*.sqlite-*
+*.jsonl
 .env
 *.egg-info/
 build/

@@ -1,140 +1,101 @@
-# Research specification — version 0.1
+# Cross-venue order flow and crypto binary price discovery
 
-Working title: **From Price Inconsistency to Executable Arbitrage:
-Optimisation and Execution Risk on Kalshi**.
+## Question and scope
 
-## Research question
+Does external order flow provide incremental information about future Kalshi
+crypto-binary price changes, after controlling for existing price information,
+and does any predictive improvement survive realistic execution costs and delay?
 
-How much apparent payoff-consistency arbitrage survives actual order-book depth,
-effective fees, receipt-time information and non-atomic execution?
+BTC is the reference experiment; ETH is the first extension. SOL follows after
+the data pipeline passes the same checks. Primary targets are midpoint changes
+over 1 and 5 seconds. These are quote-movement targets, not settlement labels.
 
-This is a replication-and-extension project. Logical arbitrage detection has
-prior literature. Our intended contribution is a reproducible measurement of
-the gap between quoted, simulated and executed results under explicit
-assumptions. We have not demonstrated that opportunities exist in this universe
-or that a strategy is profitable.
+OpenMarket (Young, arXiv:2607.26245) motivates the study. Its settlement forecasting
+experiment did not beat the market prior out of sample, and its costed trading
+simulation was negative. Applying related ideas to Kalshi, additional assets and
+future quote movements is a proposed extension, not a demonstrated alpha source.
 
-## First universe
+## Implemented milestone
 
-Begin with greater-than CPI contracts for the **same reference month**. These
-provide readable nested thresholds and a link to a recognisable market event.
-This is chosen for model validation, not because we have evidence of superior
-alpha. Sparse updates or long capital lockup may make another Kalshi family a
-better execution experiment later.
+Explicit crypto-series discovery, raw shared-clock WebSocket capture and integrity
+reports. Kalshi orderbook snapshots/deltas and Coinbase level2/market_trades are
+preserved without transformation. There is no reconstructed-book engine, feature
+dataset, estimator or trading backtest in this milestone.
 
-Do not compare different months as if their outcomes were logically nested.
-Do not treat every market under the same event as mutually exclusive. A
-threshold family generally has many YES outcomes simultaneously.
+Joint capture selects one fixed window per asset and stops before expiry. Automatic
+rollover is a next milestone. A short setup pilot verifies transport only; it does
+not supply a research-quality training/test sample.
 
-## First payoff proof
+## Protocol details that must survive reconstruction
 
-Let Y_L = 1{R > L}, Y_H = 1{R > H}, with L < H and exactly the same observed R.
-Buy q YES_L and q NO_H. Ordinary binary feasible states and payouts:
+Kalshi snapshots have YES and NO bid ladders; implied asks come from the opposite
+outcome. Dollar and quantity fields are fixed-point strings. Deltas change level
+size; snapshots replace state. Detect subscription sequence gaps and invalidate
+state until a new snapshot. Archive the exchange index; do not assume crypto is
+on shard zero.
 
-| YES_L | YES_H | Total payout |
-|---|---|---|
-| 0 | 0 | q |
-| 1 | 0 | 2q |
-| 1 | 1 | q |
+Coinbase level2 is subscribed by that name but arrives on l2_data. new_quantity
+is the new absolute quantity, not an additive change. Coinbase sequences are
+per connection, across channels. market_trades batches arrivals over roughly
+250 ms. Its side field is the maker's side: aggressive direction is opposite.
+Snapshot historical trades must not be miscounted as newly arriving flow.
 
-The impossible state (0,1) is excluded only if the full contract terms justify
-the implication. Acquisition cost is the sum of the consumed ask ladders, not
-q times the top quote when depth is insufficient. Minimum conditional surplus
-is q minus acquisition cost minus fees and other applicable costs.
+Spot prices from Coinbase are reference observations, not Kalshi's settlement
+oracle. Review each supported series' actual index, start/end averaging windows,
+rounding and equality conditions. Do not substitute instantaneous spot prices
+into a digital-option model of an averaged-index payoff.
 
-Buying YES_H and NO_L can pay zero between thresholds; do not reverse the legs.
-Strict inequality and single-decimal published observations matter at equality.
+## Planned information set and labels
 
-## Contract-review record
+Use the common monotonic application receipt clock within one capture session.
+At decision time t, features may use only frames received at or before t.
+Do not pair with the nearest external quote if it arrived later. Venue source
+timestamps are diagnostic; combining clocks naively can create artificial leads.
 
-For each proposed relationship, retain the exact market and event identifiers,
-underlying reference period, official contract-terms links, metadata hashes,
-review date and reasoning. Check the source, revisions, rounding, strict
-boundaries, publication delay, extension, cancellation, void, nonbinary and
-rulebook settlement provisions. Read the linked full terms, not just titles.
+On a fixed decision grid, reconstruct valid Kalshi midpoint m(t). The target is
+m(t+h)-m(t) for h=1s and 5s. Labels use valid state at t+h; they are never input
+features. Reject rows crossing expiry, disconnections, missing snapshots or
+unreconciled sequence gaps. Treat quiet unchanged books differently from an
+unhealthy/disconnected feed. No imputation of missing labels as zero returns.
 
-The starter proposes relations with review_status=unreviewed. Editing that JSON
-does not activate a scanner or approve a trade. A future validator must reject
-unknown settlement states and changed rules; at this stage, no live relation is
-certified. If unusual resolutions can break the binary implication, add the
-valid payout scenarios or exclude the relation from guaranteed-profit claims.
+Features to pre-specify:
+- Contract history, spread/depth, time left and verified strike/reference distance.
+- Underlying returns and volatility, including market-wide BTC returns.
+- Signed aggressive trade notional, queue imbalance and book-event order-flow
+  imbalance as distinct feature groups.
+- Each feature's lookback and availability rule, including delayed batched trades.
 
-## General mathematical target
+This milestone records the necessary inputs but does not implement these rules.
 
-For long positions x in YES/NO instruments, let A encode payouts across the
-verified feasible states. Let C(x) include full depth-dependent acquisition
-cost, fees and other relevant charges. Solve:
+## Planned model comparison
 
-    maximise over x in X: min over states s of (A_s x - C(x)).
+M0 predicts no change. M1 uses contract history, underlying prices, volatility,
+strike distance and expiry. M2 adds own-asset external order-flow features.
+M3 adds cross-asset flow and compares separate-asset versus pooled/partial-pooling
+models. Incremental gains of M2 over M1 are the main hypothesis, rather than
+simply rediscovering that binary prices respond to their underlying.
 
-X incorporates available depth, cash, lot sizes, position limits and optionally
-leg-count limits. For n strictly ordered thresholds, the ordinary binary
-settlement states form n+1 monotone regions. Enumerating those regions gives a
-small master LP for continuous, piecewise-linear costs. Fee rounding, lot sizes
-and fixed/leg-count costs can require a discrete formulation. Do not claim the
-current starter implements that optimiser: it implements the two-leg accounting
-primitive and raw data foundation.
+Start with transparent regularised linear/logistic models. More flexible models
+must beat the same baselines under identical chronological splits. Model choice,
+horizons and asset comparisons must be recorded before looking at the final test.
 
-## Fees: verify before measuring net opportunities
+## Evaluation and falsification
 
-Archive effective series fees, event overrides and scheduled changes for the
-observation time. The July 7, 2026 published schedule uses a quadratic general
-taker model with a multiplier; the API also describes per-fill model rounding,
-balance alignment and an order-level rounding accumulator. Member type matters.
-Current API metadata is not a historical fee schedule.
+Use chronological train/validation/test periods, grouping full contract windows
+and synchronising calendar splits across assets. Purge overlapping labels and
+apply a buffer accounting for feature lookbacks. Resample at day/window blocks,
+not individual high-frequency rows. The final test period stays untouched during
+feature and threshold selection. Many messages are not many independent bets.
 
-Do not hardcode old integer-cent examples or assume one depth level equals one
-fill. A verified model must reconcile against demo/actual fill-ledger behaviour
-before being used to label net executable opportunities. For now, real capture
-reports no net opportunity counts. The synthetic example accepts an explicitly
-assumed total fee reserve, not an inferred exchange fee.
+Report forecast losses relative to M0/M1 with uncertainty and asset/regime
+breakdowns. Report data gaps, actual observation duration and selection effects.
+Transfer from BTC to ETH/SOL is a separate empirical test; asset-specific fits
+must not be presented as proof of transfer.
 
-## Evaluation design
+For economics, replay available entry asks and exit bids at plausible order-arrival
+times, apply both-side fees, depth, partial fills and exposure limits. A predicted
+midpoint gain is not an executable profit. Do not invent atomic fills or reuse
+the same historical depth repeatedly. Small-asset slowness may be offset by spreads.
 
-Pre-register a fixed family and observation window before searching many
-alternatives. Keep the first capture as development data; reserve later days
-for forward evaluation once the implementation and rules are frozen.
-
-Compare, in order:
-
-1. Apparent inconsistencies in displayed quotes.
-2. Full-depth cost, verified fees and capital feasibility.
-3. Receipt-time replay with explicit latency and quote consumption.
-4. Forward paper orders/signals and operational reconciliation.
-5. Small, supervised live execution, if access and risk limits permit.
-
-Report distinct opportunity episodes rather than adding every repeated sampled
-quote. Episode merging must account for sampling gaps; polling only identifies
-sampled observations, not exact start/end times. Do not repeatedly reuse the
-same displayed depth to multiply theoretical profit.
-
-Metrics: valid data coverage, candidate count, distinct sampled episodes,
-quantity-dependent minimum surplus, capital locked and capital-days, time to
-settlement, quote survival, completed/partial/failed hedges, completion/unwind
-cost, realised P&L and differences between stages. Holding-period-normalised
-returns must use explicit capital and reuse assumptions; avoid extrapolating
-a handful of tiny trades into an annual Sharpe ratio.
-
-## First-week completion criteria
-
-- Run the offline example and explain its three payoff states.
-- Discover one event and review at least three candidate relations in its full
-  rules. Complete review can legitimately reject all candidates.
-- Collect an uninterrupted short sample, then a longer observation period.
-- Inspect missing responses, empty sides, timestamps and cross-market skew.
-- Record the fee-model assumptions still requiring reconciliation.
-- Decide whether to continue this family using observed liquidity and access,
-  without requiring that the pilot show positive P&L.
-
-## Division of work
-
-Assistant: implementation, mathematical derivations, meaningful accounting
-tests, research critique, data analysis and report preparation.
-
-User: local setup, understanding and independently explaining the payoff proof,
-helping review contract terms, running persistent collection, confirming account
-eligibility and later controlling credentials, funding and deployment.
-
-Final portfolio evidence should include a clear derivation, a reproducible
-capture/replay pipeline, comparison to simple baselines, honest negative results,
-and explanation of the largest model-to-execution discrepancies.
+Success means a reproducible, well-controlled answer. A null predictive result or
+negative net P&L is valid evidence and should stop unsupported trading claims.

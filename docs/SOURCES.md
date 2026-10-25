@@ -1,43 +1,38 @@
-# Sources and reading order
+# Primary references
 
-Official documentation checked during starter construction, October 2026.
-Recheck live documentation before implementing later trading milestones.
+## Research
 
-1. Public market data and production URL:
-   https://docs.kalshi.com/getting_started/quick_start_market_data
-2. Order-book response fields and opposite-side ask construction:
-   https://docs.kalshi.com/getting_started/orderbook_responses
-3. Market pagination, filtering and metadata:
-   https://docs.kalshi.com/api-reference/market/get-markets
-4. Series rule links and fee metadata:
-   https://docs.kalshi.com/api-reference/market/get-series
-5. Event metadata and fee overrides:
-   https://docs.kalshi.com/api-reference/events/get-event
-6. Fixed-point dollar prices and fractional quantities:
-   https://docs.kalshi.com/getting_started/fixed_point_migration
-7. Fee rounding and the order-level accumulator:
-   https://docs.kalshi.com/getting_started/fee_rounding
-8. Fee schedule (published effective date July 7, 2026 when checked):
-   https://kalshi.com/docs/kalshi-fee-schedule.pdf
-9. Current scheduled fee information:
-   https://kalshi.com/fee-schedule
-10. CPI contract terms, as linked by KXCPI series metadata:
-    https://assets.kalshi.com/contract_terms/CPI.pdf
+- Gregory Young, OpenMarket: A Synchronized Polymarket–Binance Dataset for
+  High-Frequency Prediction-Market Research: https://arxiv.org/abs/2607.26245
+- Cont, Kukanov and Stoikov, The Price Impact of Order Book Events:
+  https://arxiv.org/abs/1011.6402
+- Gould and Bonart, Queue Imbalance as a One-Tick-Ahead Price Predictor:
+  https://arxiv.org/abs/1512.03492
 
-The URLs above can change. Every discovery/capture run records the series and
-event metadata it actually retrieved; its timestamp is the relevant observation
-date. Terms must be reviewed in full. This package does not distribute copies of
-the official contract PDF or claim it has certified all exceptional resolutions.
+The latter two study equity order books. They motivate features and tests; their
+findings are not evidence of a profitable Kalshi/crypto strategy.
 
-Research papers selected in the project discussion:
+## Kalshi APIs
 
-- Hongjian Shi and Daojing Zhai, *Combinatorial Arbitrage in Prediction Markets*,
-  arXiv:2610.23517v3. Read feasible payoff states and optimisation first, then the
-  data/execution limitations. The research contribution should distinguish
-  retrospective simulated fills from actual simultaneous execution.
-- Saguillo, Ghafouri, Kiffer and Suarez-Tangil, *Unravelling the Probabilistic
-  Forest: Arbitrage in Prediction Markets*. Focus on relation discovery and
-  validation, then the limitations of inferring executable prices from trades.
+- Public metadata: https://docs.kalshi.com/getting_started/quick_start_market_data
+- Endpoints: https://docs.kalshi.com/getting_started/api_environments
+- Authentication: https://docs.kalshi.com/getting_started/quick_start_authenticated_requests
+- Streaming: https://docs.kalshi.com/getting_started/quick_start_websockets
+- Snapshot/delta schema: https://docs.kalshi.com/websockets/orderbook-updates
+- Exchange index: https://docs.kalshi.com/getting_started/exchange_sharding
+- Fixed-point values: https://docs.kalshi.com/getting_started/fixed_point_migration
+- Fees: https://kalshi.com/docs/kalshi-fee-schedule.pdf
+- Rounding: https://docs.kalshi.com/getting_started/fee_rounding
 
-These papers motivate this project; neither establishes profitable trading in
-our selected Kalshi family. The starter has no optimiser or LLM relation miner.
+## Coinbase APIs
+
+- Public feeds and authentication:
+  https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/websocket/websocket-endpoints
+- Level2: https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/websocket/level2
+- Trades: https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/websocket/market-trades
+- Machine-readable schemas, maker-side semantics and connection sequence numbers:
+  https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/advanced-trade-asyncapi.json
+
+Protocol references checked October 25, 2026. Preserve the raw payloads actually
+received; documentation and series terms can change. The two venues have
+different timestamp, quantity-update and sequence semantics.

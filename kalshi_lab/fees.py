@@ -6,7 +6,7 @@ Create one accumulator per order and feed actual fills in chronological order.
 from dataclasses import asdict, dataclass
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 
-from .books import decimal
+from .numbers import decimal
 
 D = Decimal
 MICRO = D("0.000001")
@@ -156,14 +156,3 @@ def calculate_orders(document, balance_precision):
     }
 
 
-def synthetic_pair_document():
-    """Two separate one-fill orders; no live quotes or inferred fees."""
-    return {
-        "policy": {"model": "quadratic", "taker_multiplier": "1", "maker_multiplier": "0"},
-        "orders": [
-            {"order_id": "lower_threshold_yes", "fills": [
-                {"price_dollars": "0.44", "quantity": "8", "liquidity": "taker", "direction": "buy"}]},
-            {"order_id": "higher_threshold_no", "fills": [
-                {"price_dollars": "0.52", "quantity": "8", "liquidity": "taker", "direction": "buy"}]},
-        ],
-    }
