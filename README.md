@@ -15,6 +15,8 @@ Use Python 3.10 or newer:
 ```bash
 git clone https://github.com/avinazz3/kalshi-arb.git
 cd kalshi-arb
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -e '.[stream]'
 python3 -m unittest discover -s tests -v
 python3 -m kalshi_lab demo --db data/demo.sqlite
@@ -27,6 +29,9 @@ Choose a new demo path if that file already exists. Base fee/demo commands use
 the standard library; streaming and the full test suite use the optional dependencies.
 If you installed the old `kalshi-arbitrage-lab` distribution, uninstall it first
 to avoid two installed distributions providing the same import/console command.
+Reactivate `.venv` in each new terminal. For stricter cleanup checks, run
+`python tests/run_checks.py`; it also fails on resource warnings and unexpected
+asyncio error logs, even if the test assertions themselves pass.
 
 ## First live setup test: public reference data
 
@@ -162,5 +167,5 @@ is now `kalshi-crypto-flow`; the `kalshi_lab` import and `kalshi-lab` console co
 remain stable. Existing old capture databases are not stream datasets.
 
 GitHub Actions installs the streaming extra and runs offline tests, synthetic
-capture/inspection, hand-checkable research datasets and fee examples on Python 3.10 and 3.12. No live service or
+capture/inspection, hand-checkable research datasets and fee examples on Python 3.10, 3.12 and 3.14. Resource warnings and unexpected asyncio errors fail CI. No live service or
 credentials are required by CI. Official references are in [SOURCES.md](docs/SOURCES.md).

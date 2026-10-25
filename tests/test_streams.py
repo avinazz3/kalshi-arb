@@ -1,5 +1,6 @@
 import asyncio
 import base64
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 from io import BytesIO
@@ -102,7 +103,7 @@ class RawStorageTests(unittest.TestCase):
                               mono_ns=10+i, wall_ns=100+i)
             writer.record('coinbase', 'd', 'frame', 'null', mono_ns=12, wall_ns=102)
             writer.close()
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE stream_events SET body=? WHERE id=1", (b'{"type":"orderbook_delta","sid":1,"seq":1,"tampered":true}',))
             report = inspect_stream(path)
             self.assertEqual(report['body_hash_failures'], 1)
@@ -146,7 +147,7 @@ class RawStorageTests(unittest.TestCase):
             raw = b'{"value":0.10000000000000001}'
             writer.record('coinbase', 'c', 'frame', raw, mono_ns=11, wall_ns=22)
             writer.close()
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 row = db.execute('SELECT received_mono_ns,received_wall_ns,body,sha256 FROM stream_events').fetchone()
             self.assertEqual(row, (11, 22, raw, hashlib.sha256(raw).hexdigest()))
 

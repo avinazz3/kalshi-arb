@@ -68,15 +68,22 @@ async def archived_discovery(directory, assets, deadline):
     stop_event = Event()
     task = asyncio.create_task(asyncio.to_thread(_discover_archived, directory, assets, deadline, stop_event))
     try:
-        return await asyncio.shield(task)
+        # wait() does not cancel its input task when this caller is cancelled.
+        # Unlike shield(), it also has no detached exception-logging callback.
+        await asyncio.wait({task})
+        return task.result()
     except asyncio.CancelledError:
         stop_event.set()
         # Do not leave a worker mutating the archive after the final report.
         # An in-flight HTTP request is allowed to finish its bounded timeout.
-        try:
-            await task
-        except Exception:
-            pass
+        while not task.done():
+            try:
+                await asyncio.wait({task})
+            except asyncio.CancelledError:
+                # Repeated cancellation must not detach a still-writing thread.
+                continue
+        if not task.cancelled():
+            task.exception()  # Retrieve the worker result; preserve caller cancellation.
         raise
 
 
