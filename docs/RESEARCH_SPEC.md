@@ -38,6 +38,11 @@ observed values must not be treated as uncertain future values.
 
 - GET-only diagnostic for a bounded BTC metadata/quote/outcome sample, latest BRTI
   and one historical BRTI hour. Historical access requires account entitlement.
+- Bounded retrospective BTC history with compressed typed BRTI samples, frozen
+  contract rules/references/outcomes and minute quote closes. Offline artifact
+  verification and settlement reconstruction compare four fixed whole-second
+  boundary/rounding hypotheses without selecting one; gaps, revisions and
+  mismatches remain explicit. See [HISTORICAL_DATA.md](HISTORICAL_DATA.md).
 - Physical-measure geometric Brownian motion with supplied annual volatility and
   annual price drift, using a 365-day year.
 - Analytical terminal binary probability, including explicit rounding cutoffs and

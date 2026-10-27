@@ -51,3 +51,27 @@ publication delays require a separate policy in empirical work.
 Settlement, authentication and CF data references checked October 27, 2026.
 Documentation and series terms can change; archive and review the actual
 applicable contract rules. Earlier order-flow references are retained in Git history.
+
+
+Historical-data milestone (checked 2026-10-27):
+
+- [Recent markets](https://docs.kalshi.com/api-reference/market/get-markets):
+  close-time filters are incompatible with status=settled. Local outcome validation
+  follows the close-time query.
+- [Archived markets](https://docs.kalshi.com/api-reference/historical/get-historical-markets):
+  series filter and cursor pagination; no documented time filter.
+- [Recent candles](https://docs.kalshi.com/api-reference/market/get-market-candlesticks)
+  and [archived candles](https://docs.kalshi.com/api-reference/historical/get-historical-market-candlesticks):
+  one-minute periods, inclusive end-period filters; aggregates are not executable depth.
+- [CF historical values](https://docs.cfbenchmarks.com/api/rest/historical-values/):
+  ascending times, truncated hour requests, possible 15-minute publication delay.
+- [CF convenience averages](https://docs.kalshi.com/websockets/cfbenchmarks-value):
+  quarter-hour accumulator excludes the start tick and includes close; trailing
+  avg_60s_data has different semantics. This documentation does not by itself
+  approve a historical settlement-reconstruction convention.
+- [General CRYPTO terms](https://assets.kalshi.com/contract_terms/CRYPTO.pdf):
+  60-second underlying average and exclusion of post-expiration revisions.
+  Applicable market-specific rules must still be reviewed.
+
+The audit's four sampling/rounding cases are engineering sensitivity hypotheses,
+not a claimed result from a paper or a certified Kalshi settlement implementation.
