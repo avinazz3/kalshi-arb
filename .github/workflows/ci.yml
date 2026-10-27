@@ -24,24 +24,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package
-        run: python -m pip install -e '.[stream]'
+        run: python -m pip install -e '.[data]'
       - name: Unit tests
         run: python tests/run_checks.py
       - name: Offline digital probability benchmark
         run: |
           kalshi-lab digital --input examples/digital_contract.json --out data/digital-example.json
           python -c "import json; from pathlib import Path; r=json.loads(Path('data/digital-example.json').read_text()); assert abs(r['terminal_analytic_probability']-0.6482570416278228)<1e-10; assert 0<=r['simulation']['arithmetic_average']['probability']<=1; assert r['model']=='physical_gbm_constant_parameters'"
-      - name: Synthetic stream capture and inspection
-        run: |
-          kalshi-lab demo --db data/demo.sqlite
-          kalshi-lab inspect --db data/demo.sqlite
       - name: Hypothetical entry and exit fees
         run: |
           kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.0001
           kalshi-lab fees --input examples/fee_orders.json --balance-precision 0.01
-      - name: Hand-checkable research dataset
-        run: |
-          kalshi-lab research-demo --db data/research_demo.sqlite
-          kalshi-lab replay --db data/research_demo.sqlite
-          kalshi-lab dataset --db data/research_demo.sqlite --out data/research.jsonl
-          python -c "import json; from pathlib import Path; r=[json.loads(line) for line in Path('data/research.jsonl').read_text().splitlines()]; assert len(r)==7; assert r[1]['features']['signed_aggressive_notional_usd']=='25.0100'; assert r[1]['targets']['midpoint_change_1000ms']=='0.0050'"

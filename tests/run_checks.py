@@ -1,6 +1,5 @@
-"""Run offline tests and fail on resource leaks or unexpected asyncio errors."""
+"""Run offline tests and fail on resource leaks."""
 import gc
-import logging
 from pathlib import Path
 import sys
 import unittest
@@ -12,33 +11,18 @@ sys.path.insert(0, str(ROOT))
 
 
 def run_checks(suite):
-    errors = []
-
-    class AsyncErrors(logging.Handler):
-        def emit(self, record):
-            errors.append(self.format(record))
-
-    logger = logging.getLogger("asyncio")
-    handler = AsyncErrors(level=logging.ERROR)
-    logger.addHandler(handler)
-    try:
-        with warnings.catch_warnings(record=True) as observed:
-            warnings.simplefilter("always", ResourceWarning)
-            result = unittest.TextTestRunner(verbosity=2).run(suite)
-            # sqlite connections and HTTPError objects may only warn when collected.
-            gc.collect()
-    finally:
-        logger.removeHandler(handler)
+    with warnings.catch_warnings(record=True) as observed:
+        warnings.simplefilter("always", ResourceWarning)
+        result = unittest.TextTestRunner(verbosity=2).run(suite)
+        gc.collect()
     resources = [w for w in observed if issubclass(w.category, ResourceWarning)]
     for warning in resources:
         sys.stderr.write(warnings.formatwarning(warning.message, warning.category, warning.filename, warning.lineno))
-    for error in errors:
-        print("Unexpected asyncio error:", error, file=sys.stderr)
-    if resources or errors:
-        print(f"Cleanup checks failed: {len(resources)} resource warnings, {len(errors)} asyncio errors", file=sys.stderr)
+    if resources:
+        print(f"Cleanup checks failed: {len(resources)} resource warnings", file=sys.stderr)
     else:
-        print("Cleanup checks passed: no resource warnings or unexpected asyncio errors", file=sys.stderr)
-    return result.wasSuccessful() and not resources and not errors
+        print("Cleanup checks passed: no resource warnings", file=sys.stderr)
+    return result.wasSuccessful() and not resources
 
 
 if __name__ == "__main__":

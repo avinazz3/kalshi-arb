@@ -7,9 +7,10 @@ import unittest
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
 
-from kalshi_lab.capture import kalshi_headers
+from kalshi_lab.auth import kalshi_headers, load_kalshi_auth
 from kalshi_lab.diagnostics import (MAX_BYTES, NoRedirect, ProbeFailure, ProbeHTTP,
                                     Response, index_points, run_diagnostic)
+from kalshi_lab.markets import parse_time, select_active
 
 NOW = datetime(2026, 10, 27, 10, 5, tzinfo=timezone.utc)
 
@@ -142,6 +143,34 @@ class DiagnosticTests(unittest.TestCase):
 
 
 class TransportTests(unittest.TestCase):
+    def test_local_key_loader_needs_no_streaming_dependency(self):
+        import os
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        key = ed25519.Ed25519PrivateKey.generate()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'local-private.key'
+            path.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                              serialization.NoEncryption()))
+            with patch.dict(os.environ, {'KALSHI_API_KEY_ID': 'test-id', 'KALSHI_PRIVATE_KEY_PATH': str(path)}):
+                signer = load_kalshi_auth()
+                self.assertEqual(signer('/trade-api/v2/cfbenchmarks/latest_values')['KALSHI-ACCESS-KEY'], 'test-id')
+            path.write_text('not a PEM key')
+            with patch.dict(os.environ, {'KALSHI_API_KEY_ID': 'test-id', 'KALSHI_PRIVATE_KEY_PATH': str(path)}):
+                with self.assertRaises(ValueError) as caught: load_kalshi_auth()
+                self.assertNotIn(str(path), str(caught.exception))
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, 'KALSHI_API_KEY_ID'): load_kalshi_auth()
+
+    def test_market_selection_keeps_expiry_and_timezone_guards(self):
+        valid = market()
+        expired = market(settled=True)
+        wrong_asset = {**valid, 'ticker': 'KXETH15M-OTHER'}
+        wrong_payout = {**valid, 'notional_value_dollars': '2'}
+        self.assertEqual(select_active([expired, wrong_asset, wrong_payout, valid], 'KXBTC15M', NOW), valid)
+        with self.assertRaises(ValueError): select_active([valid], 'KXBTC15M', parse_time(valid['close_time']))
+        with self.assertRaises(ValueError): parse_time('2026-10-27T10:00:00')
+
     def test_get_only_allowlist_and_query_free_signed_path(self):
         response = BytesIO(b'{"data":{"payload":[]}}')
         response.status = 200
