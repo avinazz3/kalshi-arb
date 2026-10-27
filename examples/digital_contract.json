@@ -1,0 +1,14 @@
+{
+  "input_origin": "synthetic_example_not_live_contract_rules",
+  "spot": "100100.00",
+  "reference": "100000.00",
+  "seconds_to_close": 600,
+  "annual_volatility": "0.60",
+  "annual_price_drift": "0",
+  "comparison": "greater_or_equal",
+  "round_digits": 2,
+  "rounding": "half_up",
+  "sample_offsets_seconds": [541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600],
+  "paths": 20000,
+  "seed": 1729
+}

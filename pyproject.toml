@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kalshi-crypto-flow"
-version = "0.4.1"
-description = "Reproducible cross-venue order-flow research for crypto prediction markets"
+version = "0.5.0"
+description = "Settlement-aware probability benchmarks and read-only crypto prediction-market research"
 requires-python = ">=3.10"
 dependencies = []
 
