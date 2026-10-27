@@ -8,9 +8,9 @@ simple diffusion benchmark and Kalshi's contemporaneous midpoint?
 
 Start with BTC, series KXBTC15M. Forecast the real-world probability of YES at
 10, 5 and 2 minutes before close. This is a settlement target, replacing the
-previous active 1s/5s midpoint-change experiment. The earlier specification and
-commands remain in [ORDER_FLOW_SPEC.md](ORDER_FLOW_SPEC.md) and
-[ORDER_FLOW.md](ORDER_FLOW.md); existing raw captures and exports are preserved.
+previous 1s/5s midpoint-change experiment. The earlier code and specification are
+available in Git history. Existing local raw captures and exports are not deleted
+or migrated; their commands have been retired from the active CLI.
 
 ## Payoff and information set
 
@@ -34,7 +34,7 @@ Exclude final-minute decision times initially. When adding them later, preserve
 observed closing-window samples and simulate only the remaining samples; missing
 observed values must not be treated as uncertain future values.
 
-## Implemented milestone (0.5.0)
+## Implemented milestone
 
 - GET-only diagnostic for a bounded BTC metadata/quote/outcome sample, latest BRTI
   and one historical BRTI hour. Historical access requires account entitlement.

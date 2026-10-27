@@ -23,18 +23,6 @@
   https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf
   Motivates probability scores. Historical forecast evaluation remains planned.
 
-## Earlier order-flow research
-
-- Gregory Young, OpenMarket: A Synchronized Polymarket–Binance Dataset for
-  High-Frequency Prediction-Market Research: https://arxiv.org/abs/2607.26245
-- Cont, Kukanov and Stoikov, The Price Impact of Order Book Events:
-  https://arxiv.org/abs/1011.6402
-- Gould and Bonart, Queue Imbalance as a One-Tick-Ahead Price Predictor:
-  https://arxiv.org/abs/1512.03492
-
-The latter two study equity order books. They motivate features and tests; their
-findings are not evidence of a profitable Kalshi/crypto strategy.
-
 ## Kalshi APIs
 
 - Public metadata: https://docs.kalshi.com/getting_started/quick_start_market_data
@@ -45,21 +33,9 @@ findings are not evidence of a profitable Kalshi/crypto strategy.
 - CF Benchmarks index feed: https://docs.kalshi.com/websockets/cfbenchmarks-value
 - Historical markets: https://docs.kalshi.com/api-reference/historical/get-historical-markets
 - Quote candles: https://docs.kalshi.com/api-reference/market/get-market-candlesticks
-- Streaming: https://docs.kalshi.com/getting_started/quick_start_websockets
-- Snapshot/delta schema: https://docs.kalshi.com/websockets/orderbook-updates
-- Exchange index: https://docs.kalshi.com/getting_started/exchange_sharding
 - Fixed-point values: https://docs.kalshi.com/getting_started/fixed_point_migration
 - Fees: https://kalshi.com/docs/kalshi-fee-schedule.pdf
 - Rounding: https://docs.kalshi.com/getting_started/fee_rounding
-
-## Coinbase APIs
-
-- Public feeds and authentication:
-  https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/websocket/websocket-endpoints
-- Level2: https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/websocket/level2
-- Trades: https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/websocket/market-trades
-- Machine-readable schemas, maker-side semantics and connection sequence numbers:
-  https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/advanced-trade-asyncapi.json
 
 ## CF Benchmarks upstream schemas
 
@@ -73,6 +49,5 @@ Access does not establish historical point-in-time availability; amendments and
 publication delays require a separate policy in empirical work.
 
 Settlement, authentication and CF data references checked October 27, 2026.
-Earlier order-flow protocol references checked October 25, 2026. Documentation
-and series terms can change; archive and review the actual applicable contract
-rules. The two venues have different timestamp and sequence semantics.
+Documentation and series terms can change; archive and review the actual
+applicable contract rules. Earlier order-flow references are retained in Git history.

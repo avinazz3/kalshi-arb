@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kalshi-crypto-flow"
-version = "0.5.0"
+version = "0.5.1"
 description = "Settlement-aware probability benchmarks and read-only crypto prediction-market research"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-stream = ["websockets>=15,<17", "cryptography>=45,<51"]
+data = ["cryptography>=45,<51"]
 
 [project.scripts]
 kalshi-lab = "kalshi_lab.__main__:main"

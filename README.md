@@ -18,14 +18,15 @@ Use Python 3.10 or newer. From your existing checkout:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[stream]'
+python -m pip install -e '.[data]'
 python tests/run_checks.py
 ```
 
 If your virtual environment already exists, activate it and reinstall instead of
 creating it again. The digital benchmark uses the standard library. The optional
-`stream` dependencies support authenticated data checks, the retained recorder,
-and the full test suite. Keep the distribution name `kalshi-crypto-flow` for
+`data` extra installs cryptography for authenticated REST data checks and the full
+test suite. There is no WebSocket dependency. Keep the distribution name
+`kalshi-crypto-flow` for
 installation continuity; the import `kalshi_lab` and command `kalshi-lab` are stable.
 
 ## First: run the offline probability benchmark
@@ -98,15 +99,18 @@ Unknown/empty schemas and stale current index values are explicitly blocked.
 
 No historical forecasting scores or net-profit claims exist in this milestone.
 
-## Existing work and reusable components
+## Repository scope
 
-Continue using this repository. Discovery, metadata, authentication and fee
-arithmetic remain useful. Detailed order-flow capture, book reconstruction and
-quote-change datasets are retained as a separate reproducible experiment; they
-are not required to run the new offline model. The original instructions are in
-[the legacy order-flow guide](docs/ORDER_FLOW.md), with the historical
-[order-flow specification](docs/ORDER_FLOW_SPEC.md). Existing pilot files remain
-unchanged, and their old dataset command still targets 1s/5s quote movements.
+This repository now exposes only `digital`, `diagnose` and `fees`. REST signing
+and the small metadata-selection helpers support the current diagnostic. The old
+order-flow collector, book reconstruction, quote-change datasets, demos and their
+guides have been removed from the active code; Git history retains them. Existing
+local pilot files under `data/` are not deleted or migrated by this cleanup. Use
+the earlier revision in a separate checkout if you need the retired commands.
+
+Install `.[data]` for authenticated REST data access. The former `stream` extra
+has been removed. The package/import names are stable, so an existing checkout
+and virtual environment can be updated with the installation command above.
 
 The fee calculator remains available:
 

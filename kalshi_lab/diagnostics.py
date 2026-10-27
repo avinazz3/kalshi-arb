@@ -17,9 +17,8 @@ from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from . import __version__
-from .capture import load_kalshi_auth
-from .client import BASE_URL
-from .discovery import parse_time, select_active
+from .auth import load_kalshi_auth
+from .markets import BASE_URL, parse_time, select_active
 from .numbers import decimal
 
 MAX_BYTES = 8 * 1024 * 1024
