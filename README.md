@@ -1,171 +1,119 @@
-# Crypto Flow Lab
+# Kalshi Bitcoin Probability Lab
 
-**Research question:** does external crypto order flow improve forecasts of future
-Kalshi binary-contract price changes, beyond prices, volatility and time to expiry?
+**Research question:** can a settlement-aware model of Bitcoin prices and
+volatility improve forecasts of BTC 15-minute contract outcomes relative to
+Kalshi's quoted probabilities?
 
-The first assets are BTC and ETH; SOL is available as an explicit extension.
-This milestone implements discovery, raw WebSocket capture, integrity checks,
-book reconstruction and receipt-time research datasets.
-It does not fit a forecasting model or claim an executable trading edge.
+The current milestone provides an offline digital-option benchmark and a small,
+read-only data-access diagnostic. The model takes explicit inputs; it does not
+estimate volatility, fit a forecasting model, place orders or report trading
+performance. The example is synthetic. See the
+[research specification](docs/RESEARCH_SPEC.md) and
+[model mathematics and verification](docs/DIGITAL_MODEL.md).
 
-## Setup and offline verification
+## Install and verify
 
-Use Python 3.10 or newer:
+Use Python 3.10 or newer. From your existing checkout:
 
 ```bash
-git clone https://github.com/avinazz3/kalshi-arb.git
-cd kalshi-arb
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -e '.[stream]'
-python3 -m unittest discover -s tests -v
-python3 -m kalshi_lab demo --db data/demo.sqlite
-python3 -m kalshi_lab inspect --db data/demo.sqlite
+python -m pip install -e '.[stream]'
+python tests/run_checks.py
 ```
 
-The demo is explicitly synthetic. Expect two Kalshi frames, two Coinbase frames,
-both snapshot types, zero hash failures and zero sequence discontinuities.
-Choose a new demo path if that file already exists. Base fee/demo commands use
-the standard library; streaming and the full test suite use the optional dependencies.
-If you installed the old `kalshi-arbitrage-lab` distribution, uninstall it first
-to avoid two installed distributions providing the same import/console command.
-Reactivate `.venv` in each new terminal. For stricter cleanup checks, run
-`python tests/run_checks.py`; it also fails on resource warnings and unexpected
-asyncio error logs, even if the test assertions themselves pass.
+If your virtual environment already exists, activate it and reinstall instead of
+creating it again. The digital benchmark uses the standard library. The optional
+`stream` dependencies support authenticated data checks, the retained recorder,
+and the full test suite. Keep the distribution name `kalshi-crypto-flow` for
+installation continuity; the import `kalshi_lab` and command `kalshi-lab` are stable.
 
-## First live setup test: public reference data
+## First: run the offline probability benchmark
 
 ```bash
-python3 -m kalshi_lab capture --reference-only --assets BTC ETH --seconds 30
-python3 -m kalshi_lab inspect --out data/quality_report.json
+python -m kalshi_lab digital --input examples/digital_contract.json
 ```
 
-This records Coinbase Advanced Trade heartbeats, full level-2 updates and batched
-market trades. It needs no credentials. It cannot evaluate cross-venue prediction.
-Full book snapshots can be large; inspect database growth before longer captures.
+The invented example has index value $100,100, reference $100,000, 600 seconds left,
+60% annual volatility and zero annual price drift. With its explicitly supplied
+rounding rule, the terminal-price analytical probability is about **0.648257**.
+The command also reports independent-path simulations of the terminal and the
+arithmetic-average payoffs, their Monte Carlo standard errors and Wilson intervals.
+These intervals do not account for wrong model assumptions or estimated parameters.
 
-## Joint Kalshi / Coinbase pilot
+The 60 averaging observations in this example are explicitly at offsets 541 through
+600 seconds. This is a numerical example, not an approved interpretation of a live
+contract. Live sampling boundaries, reference availability, rounding and comparison
+must be verified from the applicable contract rules before using real observations.
 
-Discover current contracts and archive their series, event and market metadata:
+To save a report, choose a new file:
 
 ```bash
-python3 -m kalshi_lab discover --assets BTC ETH
+python -m kalshi_lab digital --input examples/digital_contract.json --out data/digital-example.json
 ```
 
-The output manifest retains rule text, settlement-source links, available fee
-metadata and the authoritative exchange index. It does not approve a settlement
-interpretation or infer an effective fee policy.
+## Next: check access to the settlement index
 
-Kalshi requires authenticated WebSocket sessions even for public market data.
-Configure credentials locally using the access needed for market-data subscriptions:
+Use your existing local `KALSHI_API_KEY_ID` and `KALSHI_PRIVATE_KEY_PATH` variables.
+Private keys stay outside the repository. Do not paste them into chat.
 
 ```bash
-export KALSHI_API_KEY_ID="your-key-id"
-export KALSHI_PRIVATE_KEY_PATH="/absolute/path/to/kalshi.key"
-python3 -m kalshi_lab capture --seconds 60
-python3 -m kalshi_lab inspect --out data/quality_report.json
+python -m kalshi_lab diagnose --run-dir data/diagnostics/btc-001
 ```
 
-Use credentials/access permitted for your account and location. Keep private keys
-outside the repository. The collector never records auth headers or calls account,
-funding or order-placement endpoints. Do not paste credentials into chat.
+The command checks a small sample of active BTC contract metadata/current quotes,
+settled outcomes/historical quote candles, the current BRTI value and one historical
+BRTI hour. It makes at most seven allowlisted GET requests, with no retries,
+WebSockets, account endpoints or order endpoints. Each response is capped at 8 MiB;
+`--timeout 10` is a socket timeout per request, not a total wall-clock deadline.
 
-**The `capture` command is a fixed-window pilot.** Joint capture stops at the requested duration
-or two seconds before the earliest selected contract closes, whichever is sooner.
-It does not rotate into the next 15-minute market. Rerun discovery before another
-single-window pilot. Coinbase-only mode can run longer (up to one hour per invocation).
+It writes `diagnostic.json` and, when available, typed `index_current.csv` and
+`index_history.csv` samples. Existing run directories are preserved. Authentication
+headers, private-key paths, raw response bodies and exception text are not saved.
+The history request uses an hour starting two UTC hours before the current hour,
+to avoid confusing publication delays with missing access. It is not a bulk download.
 
-## Collect successive windows
+Exit code **0** means the sampled access checks passed. Exit code **2** means at
+least one required check is blocked; the report identifies it. Exit code **1**
+means an invalid invocation or local failure. A successful access sample does not
+certify historical coverage, real-time availability, correct rule interpretation,
+or a useful forecasting model. In particular, retrospective index history may be
+revised. CF REST access requires the appropriate Kalshi account entitlement.
 
-With those local credentials configured, start a bounded run in a new directory:
+The diagnostic's public metadata calls still run if credentials are absent or
+invalid; index checks report `credentials_unavailable`. HTTP 401/403 requires
+checking account credentials/access. HTTP 503 can represent an upstream access
+failure or an upstream service problem; do not infer entitlement from it alone.
+Unknown/empty schemas and stale current index values are explicitly blocked.
+
+## What happens after access is confirmed?
+
+1. Acquire compact historical index returns, frozen contract metadata, quotes and
+   settled outcomes; audit their timestamps and availability.
+2. Add rolling/EWMA volatility estimates using only earlier observations.
+3. Generate probabilities at 10, 5 and 2 minutes before close, initially excluding
+   decision times inside the final averaging minute.
+4. Compare probability scores and calibration on chronological held-out contracts.
+5. Assess executable prices, fees, delays and size separately if forecasts warrant it.
+
+No historical forecasting scores or net-profit claims exist in this milestone.
+
+## Existing work and reusable components
+
+Continue using this repository. Discovery, metadata, authentication and fee
+arithmetic remain useful. Detailed order-flow capture, book reconstruction and
+quote-change datasets are retained as a separate reproducible experiment; they
+are not required to run the new offline model. The original instructions are in
+[the legacy order-flow guide](docs/ORDER_FLOW.md), with the historical
+[order-flow specification](docs/ORDER_FLOW_SPEC.md). Existing pilot files remain
+unchanged, and their old dataset command still targets 1s/5s quote movements.
+
+The fee calculator remains available:
 
 ```bash
-python3 -m kalshi_lab collect --assets BTC ETH --seconds 3600 --run-dir data/runs/pilot-001
+python -m kalshi_lab fees --input examples/fee_orders.json --balance-precision 0.0001
 ```
 
-The coordinator discovers active contracts, records each window into its own
-capture session/database, waits through expiry and discovers the next contracts.
-`run.json` checkpoints per-window mappings, statuses, actual frame coverage and
-gaps. Metadata responses and failed attempts are retained. It skips near-expiry
-windows, retries temporary metadata outages and stops on authentication/storage
-failures. Existing run directories are preserved; use a new path for another run.
-
-Rollover reconnects both feeds, so there are explicit boundary/setup gaps. Every
-dataset stays within its own session and contract window. See [COLLECTION.md](docs/COLLECTION.md)
-for retry/deadline behavior, verification tests and batch dataset export.
-
-## What the recorder preserves
-
-- A session manifest with asset/contract mappings and capture configuration.
-- Raw application-level WebSocket messages, byte hashes and connection IDs.
-- One process's wall and monotonic receipt timestamps, taken before parsing or
-  database queueing; source timestamps remain inside raw messages.
-- Connection/disconnection events. Network failures reconnect with fresh IDs.
-- A bounded background writer queue. A full queue aborts capture instead of
-  silently dropping messages.
-
-SQLite writes are batched, so a hard crash can lose the final uncommitted batch.
-Graceful completion flushes the queue. Receipt times are application-level times,
-not wire-arrival or exchange-engine timestamps; local buffering/CPU/network delays
-remain part of the measurement.
-
-The inspector checks hashes, malformed frames and sequence discontinuities.
-It also records completion markers and per-venue first/last frame times, so
-connection setup time is not mistaken for actual observation coverage.
-Kalshi sequence checks are per subscription and connection; Coinbase sequences
-span channels within a connection. Counts are not order-book validation, data
-completeness certification, opportunity durations or trading results.
-
-## Reusable execution-cost arithmetic
-
-```bash
-python3 -m kalshi_lab fees --input examples/fee_orders.json --balance-precision 0.0001
-```
-
-The example is a hypothetical purchase of eight YES contracts at $0.44 followed
-by a sale at $0.52. Its explicit fee policy produces $0.2778 in modelled fees and
-a $0.3622 net cash change. No such trade has been observed or executed.
-See [the fee model](docs/FEE_MODEL.md) for rounding and configuration limits.
-
-## Reconstruct books and build features/labels
-
-First run a hand-checkable synthetic experiment without credentials:
-
-```bash
-python3 -m kalshi_lab research-demo --db data/research_demo.sqlite
-python3 -m kalshi_lab replay --db data/research_demo.sqlite
-python3 -m kalshi_lab dataset --db data/research_demo.sqlite --out data/research.jsonl
-```
-
-Expect seven rows. At the 2s decision, aggressive notional over the previous second
-is +$25.01, message-level Coinbase OFI is +2 units, and the next 1s Kalshi midpoint
-change is +$0.005. These are invented events with known answers, not trading results.
-
-On a completed joint live capture, replace the database path above with
-`data/capture.sqlite`. Use `--session ID` if it contains multiple sessions.
-The dataset command writes JSONL with separate feature/target objects and a
-`.manifest.json` sidecar containing hashes, settings and rejection counts.
-Existing dataset outputs are never overwritten. A reference-only capture can
-be replayed but cannot produce this joint dataset.
-
-Defaults use a 1s decision grid/lookback and 1s/5s future midpoint-change targets.
-Broken sequences, reconnects, invalid books, insufficient feed activity and
-expiry-crossing rows are rejected. Read [DATASET.md](docs/DATASET.md) for exact
-definitions, limitations and a manual verification example. Forecasts and
-executable-profit estimates are not implemented yet.
-
-## What follows this milestone
-
-Read [the experiment specification](docs/RESEARCH_SPEC.md) before collecting a
-research sample. Next come supervised joint collection, the remaining price controls,
-baseline forecasts and chronological evaluation. Economic replay and supervised
-live execution follow only if warranted.
-
-The earlier CPI arbitrage experiment, relation proposals and recorded CPI sample
-were removed from the active tree. Git history retains that work. The distribution
-is now `kalshi-crypto-flow`; the `kalshi_lab` import and `kalshi-lab` console command
-remain stable. Existing old capture databases are not stream datasets.
-
-GitHub Actions installs the streaming extra and runs offline tests, synthetic
-capture/inspection, hand-checkable research datasets and fee examples on Python 3.10, 3.12 and 3.14. Resource warnings and unexpected asyncio errors fail CI. No live service or
-credentials are required by CI. Official references are in [SOURCES.md](docs/SOURCES.md).
+GitHub Actions runs offline tests and examples on Python 3.10, 3.12 and 3.14.
+Tests use generated keys and mocked transport; no live credentials are required.
+Primary references and access dates are in [SOURCES.md](docs/SOURCES.md).

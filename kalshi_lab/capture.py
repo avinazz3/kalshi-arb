@@ -29,7 +29,7 @@ def load_kalshi_auth():
     """Preflight local credentials without writing them to any artifact."""
     key_id, key_path = os.environ.get("KALSHI_API_KEY_ID"), os.environ.get("KALSHI_PRIVATE_KEY_PATH")
     if not key_id or not key_path:
-        raise ValueError("Joint streaming requires local KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH; reference-only needs neither")
+        raise ValueError("Kalshi data access requires local KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH; reference-only needs neither")
     try:
         import websockets  # noqa: F401
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -39,16 +39,18 @@ def load_kalshi_auth():
         private_key = load_pem_private_key(Path(key_path).read_bytes(), password=None)
     except (OSError, ValueError, TypeError):
         raise ValueError("Could not load the local Kalshi key; check its path and PEM format") from None
-    auth = lambda: kalshi_headers(key_id, private_key)
+    auth = lambda path="/trade-api/ws/v2": kalshi_headers(key_id, private_key, path=path)
     auth()
     return auth
 
 
-def kalshi_headers(key_id, private_key, timestamp_ms=None):
+def kalshi_headers(key_id, private_key, timestamp_ms=None, *, path="/trade-api/ws/v2"):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding, rsa, ed25519
+    if not path.startswith("/trade-api/") or "?" in path or "#" in path:
+        raise ValueError("Sign a Kalshi API path without query parameters")
     timestamp = str(int(time.time() * 1000) if timestamp_ms is None else timestamp_ms)
-    message = (timestamp + "GET/trade-api/ws/v2").encode()
+    message = (timestamp + "GET" + path).encode()
     if isinstance(private_key, ed25519.Ed25519PrivateKey):
         signature = private_key.sign(message)
     elif isinstance(private_key, rsa.RSAPrivateKey):

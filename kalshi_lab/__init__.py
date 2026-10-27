@@ -1,2 +1,2 @@
-"""Cross-venue crypto prediction-market research."""
-__version__ = "0.4.1"
+"""Settlement-aware probability research for crypto prediction contracts."""
+__version__ = "0.5.0"

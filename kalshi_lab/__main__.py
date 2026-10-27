@@ -1,4 +1,4 @@
-"""Crypto capture, reconstruction, research datasets and fee accounting."""
+"""Binary-contract probability research, read-only data and fee accounting."""
 import argparse
 import asyncio
 from decimal import DecimalException
@@ -19,14 +19,21 @@ def dump(value):
     return json.dumps(value, indent=2, default=str, allow_nan=False)
 
 
-def write_json(path, value):
+def write_json(path, value, *, exclusive=False):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(dump(value) + "\n", encoding="utf-8")
+    with Path(path).open("x" if exclusive else "w", encoding="utf-8") as handle:
+        handle.write(dump(value) + "\n")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Crypto Flow Lab: read-only research data and fee accounting")
+    parser = argparse.ArgumentParser(description="Kalshi Lab: settlement probability research and read-only data")
     sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("digital", help="Offline physical-GBM terminal and averaged-payoff probability benchmark")
+    p.add_argument("--input", required=True)
+    p.add_argument("--out", help="New JSON output file; existing files are preserved")
+    p = sub.add_parser("diagnose", help="Bounded BTC metadata, quotes and CF index data-access checks")
+    p.add_argument("--run-dir", required=True, help="New directory for the report and compact index samples")
+    p.add_argument("--timeout", type=float, default=10, help="Socket timeout per HTTP request, 1 to 30 seconds; no retries")
     p = sub.add_parser("discover", help="Archive current crypto series/event/market metadata")
     p.add_argument("--assets", nargs="+", choices=tuple(ASSETS), default=["BTC", "ETH"])
     p.add_argument("--out", default="data/universe.json")
@@ -72,7 +79,16 @@ def main():
         if (getattr(args, "out", None) and getattr(args, "db", None)
                 and Path(args.out).resolve() == Path(args.db).resolve()):
             raise ValueError("Output must differ from raw database")
-        if args.command == "discover":
+        if args.command == "digital":
+            from .digital import benchmark
+            if args.out and Path(args.out).exists():
+                raise ValueError("Output already exists; choose a new path")
+            document = json.loads(Path(args.input).read_text(), parse_float=str)
+            result = benchmark(document)
+        elif args.command == "diagnose":
+            from .diagnostics import run_diagnostic
+            result = run_diagnostic(args.run_dir, timeout=args.timeout)
+        elif args.command == "discover":
             store = Store(args.db)
             try:
                 result = discover(Client(store), args.assets)
@@ -111,9 +127,9 @@ def main():
             document = json.loads(Path(args.input).read_text(), parse_float=str)
             result = calculate_orders(document, args.balance_precision)
         if getattr(args, "out", None) and args.command not in ("discover", "dataset"):
-            write_json(args.out, result)
+            write_json(args.out, result, exclusive=args.command == "digital")
         print(dump(result))
-        return 0
+        return 2 if args.command == "diagnose" and result["status"] != "access_checks_passed" else 0
     except KeyboardInterrupt:
         print("Stopped; committed raw data remains available.", file=sys.stderr)
         return 130

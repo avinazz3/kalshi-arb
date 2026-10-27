@@ -27,6 +27,10 @@ jobs:
         run: python -m pip install -e '.[stream]'
       - name: Unit tests
         run: python tests/run_checks.py
+      - name: Offline digital probability benchmark
+        run: |
+          kalshi-lab digital --input examples/digital_contract.json --out data/digital-example.json
+          python -c "import json; from pathlib import Path; r=json.loads(Path('data/digital-example.json').read_text()); assert abs(r['terminal_analytic_probability']-0.6482570416278228)<1e-10; assert 0<=r['simulation']['arithmetic_average']['probability']<=1; assert r['model']=='physical_gbm_constant_parameters'"
       - name: Synthetic stream capture and inspection
         run: |
           kalshi-lab demo --db data/demo.sqlite

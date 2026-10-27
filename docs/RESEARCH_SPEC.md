@@ -1,111 +1,107 @@
-# Cross-venue order flow and crypto binary price discovery
+# Settlement-aware Bitcoin contract probabilities
 
-## Question and scope
+## Question and first scope
 
-Does external order flow provide incremental information about future Kalshi
-crypto-binary price changes, after controlling for existing price information,
-and does any predictive improvement survive realistic execution costs and delay?
+Do time-varying volatility, distribution assumptions and accurate settlement
+averaging improve forecasts of BTC 15-minute contract outcomes relative to a
+simple diffusion benchmark and Kalshi's contemporaneous midpoint?
 
-BTC is the reference experiment; ETH is the first extension. SOL follows after
-the data pipeline passes the same checks. Primary targets are midpoint changes
-over 1 and 5 seconds. These are quote-movement targets, not settlement labels.
+Start with BTC, series KXBTC15M. Forecast the real-world probability of YES at
+10, 5 and 2 minutes before close. This is a settlement target, replacing the
+previous active 1s/5s midpoint-change experiment. The earlier specification and
+commands remain in [ORDER_FLOW_SPEC.md](ORDER_FLOW_SPEC.md) and
+[ORDER_FLOW.md](ORDER_FLOW.md); existing raw captures and exports are preserved.
 
-OpenMarket (Young, arXiv:2607.26245) motivates the study. Its settlement forecasting
-experiment did not beat the market prior out of sample, and its costed trading
-simulation was negative. Applying related ideas to Kalshi, additional assets and
-future quote movements is a proposed extension, not a demonstrated alpha source.
+## Payoff and information set
 
-## Implemented milestone
+Represent the contract by its actual rule version: opening reference K, index ID,
+opening/closing sampling timestamps, arithmetic averaging, rounding and equality
+conditions. The schematic target is P(rounded closing average >= K | G_t).
+The comparison must instead be strict if the particular rules require it.
+Do not infer those conditions from a ticker, a chart or prose similarities.
+The active market's observed reference must be available before the prediction.
 
-Explicit crypto-series discovery, raw shared-clock WebSocket capture, integrity
-reports, exact snapshot/delta reconstruction and as-of feature/label datasets.
-Raw Kalshi/Coinbase frames remain preserved. The offline layer adds quote history,
-best-level queue imbalance, message-level Coinbase OFI, signed aggressive trade
-notional and 1s/5s future midpoint-change targets. See [DATASET.md](DATASET.md) for
-precise availability, validity and audit rules. There is no estimator or trading
-backtest in this milestone. The `collect` coordinator now discovers and records
-successive synchronized 15-minute windows as separate sessions, with metadata,
-quality reports, retry limits and actual coverage/gap reporting. See
-[COLLECTION.md](COLLECTION.md).
+G_t contains contract metadata and index observations received by decision time t,
+including earlier price history used to estimate volatility. Store source and
+receipt timestamps and revision flags. Select a stale-data limit before testing.
+A source timestamp before t does not make a later-received observation available
+at t. Retrospective index history may be amended and cannot prove old receipt-time
+availability; distinguish retrospective modelling from prospective validation.
+A minute OHLC candle does not reconstruct the sixty settlement observations.
+Coinbase prices can only be labelled proxies, with index-basis error assessed.
 
-The single-window `capture` command stops before expiry. `collect` coordinates
-rollover by starting fresh captures after each expiry; boundary/setup gaps remain.
-A short setup pilot verifies transport only; it does
-not supply a research-quality training/test sample.
+Exclude final-minute decision times initially. When adding them later, preserve
+observed closing-window samples and simulate only the remaining samples; missing
+observed values must not be treated as uncertain future values.
 
-## Protocol details that must survive reconstruction
+## Implemented milestone (0.5.0)
 
-Kalshi snapshots have YES and NO bid ladders; implied asks come from the opposite
-outcome. Dollar and quantity fields are fixed-point strings. Deltas change level
-size; snapshots replace state. Detect subscription sequence gaps and invalidate
-state until a new snapshot. Archive the exchange index; do not assume crypto is
-on shard zero.
+- GET-only diagnostic for a bounded BTC metadata/quote/outcome sample, latest BRTI
+  and one historical BRTI hour. Historical access requires account entitlement.
+- Physical-measure geometric Brownian motion with supplied annual volatility and
+  annual price drift, using a 365-day year.
+- Analytical terminal binary probability, including explicit rounding cutoffs and
+  deterministic cases, plus independent-path Monte Carlo on explicit observation
+  schedules for terminal and arithmetic-average payoffs.
+- Comparison/rounding fixtures, analytical versus simulated probability checks,
+  random-seed reproducibility and Monte Carlo uncertainty reporting.
 
-Coinbase level2 is subscribed by that name but arrives on l2_data. new_quantity
-is the new absolute quantity, not an additive change. Coinbase sequences are
-per connection, across channels. market_trades batches arrivals over roughly
-250 ms. Its side field is the maker's side: aggressive direction is opposite.
-Snapshot historical trades must not be miscounted as newly arriving flow.
-
-Spot prices from Coinbase are reference observations, not Kalshi's settlement
-oracle. Review each supported series' actual index, start/end averaging windows,
-rounding and equality conditions. Do not substitute instantaneous spot prices
-into a digital-option model of an averaged-index payoff.
-
-## Planned information set and labels
-
-Use the common monotonic application receipt clock within one capture session.
-At decision time t, features may use only frames received at or before t.
-Do not pair with the nearest external quote if it arrived later. Venue source
-timestamps are diagnostic; combining clocks naively can create artificial leads.
-
-On a fixed decision grid, reconstruct valid Kalshi midpoint m(t). The target is
-m(t+h)-m(t) for h=1s and 5s. Labels use valid state at t+h; they are never input
-features. Reject rows crossing expiry, disconnections, missing snapshots or
-unreconciled sequence gaps. Treat quiet unchanged books differently from an
-unhealthy/disconnected feed. No imputation of missing labels as zero returns.
-
-Features to pre-specify:
-- Contract history, spread/depth, time left and verified strike/reference distance.
-- Underlying returns and volatility, including market-wide BTC returns.
-- Signed aggressive trade notional, queue imbalance and book-event order-flow
-  imbalance as distinct feature groups.
-- Each feature's lookback and availability rule, including delayed batched trades.
-
-The current dataset implements receipt-time alignment, contract-window bounds,
-continuity checks and the core own-asset flow features. Volatility, verified
-strike/reference distance, cross-asset features and full M1/M2 comparisons remain
-to be implemented. The existing feature set is not the full price-only baseline.
+These are conditional model calculations with explicit inputs. They do not fit
+volatility or drift, certify live settlement rules, export a historical settlement
+forecast dataset, evaluate calibration, or simulate executable trades. There are
+no claimed historical forecasting results. See [DIGITAL_MODEL.md](DIGITAL_MODEL.md).
 
 ## Planned model comparison
 
-M0 predicts no change. M1 uses contract history, underlying prices, volatility,
-strike distance and expiry. M2 adds own-asset external order-flow features.
-M3 adds cross-asset flow and compares separate-asset versus pooled/partial-pooling
-models. Incremental gains of M2 over M1 are the main hypothesis, rather than
-simply rediscovering that binary prices respond to their underlying.
+Keep the payoff calculation and evaluation observations consistent:
 
-Start with transparent regularised linear/logistic models. More flexible models
-must beat the same baselines under identical chronological splits. Model choice,
-horizons and asset comparisons must be recorded before looking at the final test.
+1. Constant-parameter diffusion with a rolling historical volatility estimate.
+2. The same diffusion with EWMA volatility, fixed during each individual forecast.
+3. Conditional volatility/distribution alternatives, such as GARCH with Gaussian
+   versus heavy-tailed innovations. Specify a coherent path model for the closing
+   average, rather than assuming a multi-step return is a one-step Student-t draw.
+4. HAR-based alternatives only if the data and earlier results justify them.
 
-## Evaluation and falsification
+Initial annual *price* drift is zero. This means log-price drift is -sigma^2/2,
+not zero. Drift changes require their own chronological validation; minute-level
+sample means are noisy. Historical volatility estimates describe a physical
+forecast. A Black-Scholes option price uses a pricing measure and discounting;
+these are separate experimental objects, not interchangeable probabilities.
 
-Use chronological train/validation/test periods, grouping full contract windows
-and synchronising calendar splits across assets. Purge overlapping labels and
-apply a buffer accounting for feature lookbacks. Resample at day/window blocks,
-not individual high-frequency rows. The final test period stays untouched during
-feature and threshold selection. Many messages are not many independent bets.
+Record training period, initialization, lookbacks, volatility units, parameter
+estimation, random seed/path count and the actual averaging rule for every forecast.
+Estimation history can precede the 15-minute contract. Never substitute invented
+example volatility for fitted parameters when reporting empirical performance.
 
-Report forecast losses relative to M0/M1 with uncertainty and asset/regime
-breakdowns. Report data gaps, actual observation duration and selection effects.
-Transfer from BTC to ETH/SOL is a separate empirical test; asset-specific fits
-must not be presented as proof of transfer.
+## Evaluation
 
-For economics, replay available entry asks and exit bids at plausible order-arrival
-times, apply both-side fees, depth, partial fills and exposure limits. A predicted
-midpoint gain is not an executable profit. Do not invent atomic fills or reuse
-the same historical depth repeatedly. Small-asset slowness may be offset by spreads.
+Use chronological train/validation/test periods. Keep every observation for a
+contract in one split and group inference by contract/day. Three predictions
+per contract share one outcome; they are not three independent bets. Purge training
+labels that would not yet have resolved at the first validation/test decision.
+Fix model settings before the final untouched period. Report missing observations,
+coverage, stale-index/quote exclusions and rule/reference failures by horizon.
 
-Success means a reproducible, well-controlled answer. A null predictive result or
-negative net P&L is valid evidence and should stop unsupported trading claims.
+Use Brier score and log loss against realised settled YES/NO outcomes. Include the
+contemporaneous market midpoint and a simple diffusion benchmark on identical
+rows. Assess calibration by prediction horizon and volatility/reference-distance
+regime. Score the full return distribution when relevant; matching volatility
+alone need not produce good binary probabilities. Numerical simulation error and
+parameter/model uncertainty are different and must be reported separately.
+
+For prospective evidence, archive the inputs as they arrive and only later attach
+outcomes. Confirm exact reference data access before building around it. Start
+with an access/quality sample; multiple days/regimes and an untouched future period
+are necessary before drawing forecasting conclusions.
+
+## Economics and research contribution
+
+A discrepancy from the market is a candidate signal, not proof of mispricing.
+Any execution study must use available asks/bids, observed size and plausible
+arrival delays, with the actual fee policy and rounding. Historical quote candles
+are not proof that a hypothetical order could fill. Settlement timing and holding
+risk matter even when no early exit is planned.
+
+The contribution is a reproducible test of settlement-aware probability forecasts
+under limited data requirements. Established digital-option mathematics alone is
+not novel, and a null forecasting or trading result is a valid research outcome.
