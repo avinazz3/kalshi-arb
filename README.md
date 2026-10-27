@@ -4,8 +4,9 @@
 volatility improve forecasts of BTC 15-minute contract outcomes relative to
 Kalshi's quoted probabilities?
 
-The current milestone provides an offline digital-option benchmark and a small,
-read-only data-access diagnostic. The model takes explicit inputs; it does not
+The current milestone provides an offline digital-option benchmark, a small
+read-only access diagnostic, and bounded historical BTC downloads with an offline
+settlement reconstruction audit. The model takes explicit inputs; it does not
 estimate volatility, fit a forecasting model, place orders or report trading
 performance. The example is synthetic. See the
 [research specification](docs/RESEARCH_SPEC.md) and
@@ -87,7 +88,30 @@ checking account credentials/access. HTTP 503 can represent an upstream access
 failure or an upstream service problem; do not infer entitlement from it alone.
 Unknown/empty schemas and stale current index values are explicitly blocked.
 
-## What happens after access is confirmed?
+## After access passes: download and audit a historical sample
+
+```bash
+python -m kalshi_lab history --start 2026-10-25T00:00:00Z --hours 1 --run-dir data/history/btc-hour-001
+python -m kalshi_lab audit --run-dir data/history/btc-hour-001
+```
+
+This finishes after downloading historical data; it does not collect live for an
+hour. The sample includes a prior warm-up hour and the hour containing the final
+close tick. Start with one hour, then use `--hours 24` and a new directory for a day.
+Dates must align to a whole UTC hour and the interval end must be at least 75
+minutes old. Existing data and report files are preserved.
+
+The downloader saves compressed typed BRTI observations (including intra-second
+values and revision flags), frozen contract rules/references/outcomes and one-minute
+quote closes. The audit verifies file hashes, requires all 60 exact-second samples
+for each mean, and reports opening-reference and closing-outcome mismatches under
+four explicit boundary/rounding hypotheses. It **does not choose a rule** or certify
+that backfilled data was available at historical decision times. Read the report's
+mismatch counts even when the command exits successfully. See the
+[historical-data workflow](docs/HISTORICAL_DATA.md) for files, limits, exit codes and
+remaining rule questions.
+
+## What happens after the settlement audit?
 
 1. Acquire compact historical index returns, frozen contract metadata, quotes and
    settled outcomes; audit their timestamps and availability.
@@ -101,8 +125,8 @@ No historical forecasting scores or net-profit claims exist in this milestone.
 
 ## Repository scope
 
-This repository now exposes only `digital`, `diagnose` and `fees`. REST signing
-and the small metadata-selection helpers support the current diagnostic. The old
+This repository exposes `digital`, `diagnose`, `history`, `audit` and `fees`.
+REST signing and metadata helpers support read-only data access. The old
 order-flow collector, book reconstruction, quote-change datasets, demos and their
 guides have been removed from the active code; Git history retains them. Existing
 local pilot files under `data/` are not deleted or migrated by this cleanup. Use
