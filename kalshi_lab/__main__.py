@@ -31,8 +31,10 @@ def main():
     p.add_argument("--start", required=True, help="Timezone-aware start, aligned to a whole UTC hour")
     p.add_argument("--hours", type=int, default=24, help="Contract interval, 1 to 24 hours")
     p.add_argument("--warmup-hours", type=int, default=1, help="Prior index history, 1 to 24 hours")
-    p.add_argument("--run-dir", required=True, help="New dataset directory")
+    p.add_argument("--run-dir", required=True, help="Dataset directory; existing runs require --resume")
     p.add_argument("--timeout", type=float, default=10)
+    p.add_argument("--resume", action="store_true", help="Continue missing index hours after verifying frozen contracts, quotes and saved files")
+    p.add_argument("--retries", type=int, choices=(0, 1, 2), default=2, help="Extra attempts for transient GET failures, default 2")
     p = sub.add_parser("audit", help="Offline settlement reconstruction under four explicit sampling/rounding hypotheses")
     p.add_argument("--run-dir", required=True)
     p.add_argument("--out", help="New audit JSON file; defaults to run-dir/settlement_audit.json")
@@ -54,7 +56,7 @@ def main():
         elif args.command == "history":
             from .history import fetch_history
             result = fetch_history(args.run_dir, start=args.start, hours=args.hours,
-                                   warmup_hours=args.warmup_hours, timeout=args.timeout)
+                                   warmup_hours=args.warmup_hours, timeout=args.timeout, retries=args.retries, resume=args.resume)
         elif args.command == "audit":
             from .settlement import audit_dataset
             args.out = args.out or str(Path(args.run_dir) / "settlement_audit.json")
@@ -70,6 +72,8 @@ def main():
             print(dump({key: result[key] for key in ("status", "settings", "issues")} | {
                 "contracts": result.get("contracts"), "requests": len(result["requests"]),
                 "index_hours": len(result["index_hours"]), "failure": result.get("failure"),
+                "requests_this_run": result["requests_this_run"], "reused_index_hours": result["reused_index_hours"],
+                "request_policy": result["request_policy"],
                 "manifest": str(Path(args.run_dir) / "manifest.json")}))
         elif args.command == "audit":
             print(dump({key: result[key] for key in ("status", "contracts", "rule_review_required", "selected_candidate")} | {

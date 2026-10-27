@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from kalshi_lab.diagnostics import ProbeFailure, Response
 from kalshi_lab.history import digest, fetch_history, quote_rows, save_json
@@ -310,6 +311,209 @@ class HistoryTests(unittest.TestCase):
             path = Path(tmp)/'history'
             with self.assertRaises(KeyboardInterrupt): download(path, Interrupted())
             self.assertEqual(json.loads((path/'manifest.json').read_text())['status'], 'interrupted')
+
+
+class RecoveryTests(unittest.TestCase):
+    def partial(self, path):
+        class StopsAfterWarmup(FakeHTTP):
+            def get(self, endpoint, params):
+                if endpoint.endswith('/history/values') and params['timestamp'] == START.isoformat(timespec='milliseconds').replace('+00:00', 'Z'):
+                    self.calls.append((endpoint, params))
+                    raise ProbeFailure('network_error')
+                return super().get(endpoint, params)
+        report = download(path, StopsAfterWarmup(), retries=0)
+        self.assertEqual(report['status'], 'blocked')
+        self.assertEqual(len(report['index_hours']), 1)
+        return report
+
+    def test_resume_legacy_060_checkpoint_only_downloads_missing_hours(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            report = self.partial(path)
+            report['package_version'] = '0.6.0'
+            report['settings'].pop('retries')
+            for key in ('request_policy', 'requests_this_run', 'reused_index_hours', 'contracts', 'quote_rows'):
+                report.pop(key, None)
+            for request in report['requests']:
+                request.pop('attempt', None)
+                request.pop('timeout', None)
+            save_json(path/'manifest.json', report)
+            original_manifest = (path/'manifest.json').read_bytes()
+            original_files = {e['path']: (path/e['path']).read_bytes() for e in report['files']}
+            old_audit = json.dumps(audit_dataset(path)).encode()
+            (path/'settlement_audit.json').write_bytes(old_audit)
+            http = FakeHTTP(revised=True)
+            resumed = download(path, http, resume=True, timeout=30)
+            self.assertEqual(resumed['status'], 'downloaded')
+            self.assertEqual(resumed['contracts'], 4)
+            self.assertEqual(resumed['quote_rows'], 60)
+            self.assertEqual(resumed['reused_index_hours'], 1)
+            self.assertEqual(resumed['requests_this_run'], 2)
+            self.assertEqual(len(http.calls), 2)
+            self.assertTrue(all(endpoint.endswith('/history/values') for endpoint, _ in http.calls))
+            self.assertEqual((path/'manifest.before-resume-0001.json').read_bytes(), original_manifest)
+            self.assertEqual(resumed['resumptions'][0]['previous_sha256'], digest(path/'manifest.before-resume-0001.json'))
+            self.assertEqual((path/'settlement_audit.json').read_bytes(), old_audit)
+            for name, data in original_files.items():
+                self.assertEqual((path/name).read_bytes(), data)
+            self.assertEqual(audit_dataset(path)['status'], 'computed')
+            self.assertFalse(list((path/'index').glob('*.tmp')))
+
+    def test_day_failure_at_request_114_resumes_ten_hours_without_recapturing_96_markets(self):
+        class Day(FakeHTTP):
+            def __init__(self, fail=False):
+                super().__init__()
+                self.fail = fail
+            def get(self, endpoint, params):
+                if endpoint == '/markets':
+                    self.calls.append((endpoint, params))
+                    return Response({'markets': [market(i) for i in range(96)], 'cursor': ''}, 'synthetic', NOW.isoformat())
+                if self.fail and endpoint.endswith('/history/values') and params['timestamp'] == (START+timedelta(hours=15)).isoformat(timespec='milliseconds').replace('+00:00', 'Z'):
+                    self.calls.append((endpoint, params))
+                    raise ProbeFailure('network_error')
+                return super().get(endpoint, params)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            report = fetch_history(path, start=START.isoformat(), hours=24, http=Day(fail=True), now=NOW, retries=0, pause=lambda _: None)
+            self.assertEqual(report['status'], 'blocked')
+            self.assertEqual(len(report['requests']), 114)
+            self.assertEqual(len(report['index_hours']), 16)
+            partial = audit_dataset(path)
+            left = next(c for c in partial['candidates'] if c['boundary'] == 'left_closed' and c['rounding'] == 'half_up')
+            self.assertEqual(left['counts']['opening_matches_reference']['matches'], 61)
+            self.assertEqual(left['counts']['expiration_value_matches']['matches'], 60)
+            preserved = {entry['path']: digest(path/entry['path']) for entry in report['files']}
+            http = Day()
+            resumed = fetch_history(path, start=START.isoformat(), hours=24, http=http, now=NOW, resume=True, timeout=30, pause=lambda _: None)
+            self.assertEqual(resumed['status'], 'downloaded')
+            self.assertEqual(resumed['reused_index_hours'], 16)
+            self.assertEqual(resumed['requests_this_run'], 10)
+            self.assertEqual(len(resumed['requests']), 124)
+            self.assertEqual(len(http.calls), 10)
+            self.assertTrue(all(endpoint.endswith('/history/values') for endpoint, _ in http.calls))
+            for name, sha in preserved.items():
+                self.assertEqual(digest(path/name), sha)
+            complete = audit_dataset(path)
+            self.assertEqual(complete['status'], 'computed')
+            for candidate in complete['candidates']:
+                self.assertEqual(candidate['counts']['opening_matches_reference']['matches'], 96)
+                self.assertEqual(candidate['counts']['expiration_value_matches']['matches'], 96)
+
+    def test_retry_success_and_backoff_are_recorded(self):
+        for failure in (ProbeFailure('network_error'), ProbeFailure('http_error', 429), ProbeFailure('http_error', 503)):
+            class Flaky(FakeHTTP):
+                def get(self, path, params):
+                    if not self.calls:
+                        self.calls.append((path, params))
+                        raise failure
+                    return super().get(path, params)
+            pauses, http = [], Flaky()
+            with tempfile.TemporaryDirectory() as tmp:
+                report = fetch_history(Path(tmp)/'history', start=START.isoformat(), hours=1,
+                                       now=NOW, http=http, pause=pauses.append)
+            self.assertEqual(report['status'], 'downloaded')
+            self.assertEqual(len(http.calls), 9)
+            self.assertEqual(report['requests'][0]['status'], 'retrying')
+            self.assertEqual(report['requests'][1]['attempt'], 2)
+            self.assertIn(1, pauses)
+            self.assertTrue(all(delay >= .3 for delay in pauses))
+
+    def test_retry_exhaustion_and_non_transient_errors_have_finite_attempts(self):
+        for failure, expected in [(ProbeFailure('network_error'), 3), (ProbeFailure('http_error', 500), 3),
+                                  (ProbeFailure('http_error', 403), 1), (ProbeFailure('http_error', 400), 1),
+                                  (ProbeFailure('invalid_json'), 1), (ProbeFailure('unexpected_schema'), 1)]:
+            http = FakeHTTP(failure=('/markets', failure))
+            pauses = []
+            with tempfile.TemporaryDirectory() as tmp:
+                report = fetch_history(Path(tmp)/'history', start=START.isoformat(), hours=1,
+                                       now=NOW, http=http, pause=pauses.append)
+            self.assertEqual(report['status'], 'blocked')
+            self.assertEqual(len(http.calls), expected)
+            self.assertEqual(len(report['requests']), expected)
+            self.assertEqual(report['requests'][-1]['status'], 'blocked')
+            if expected == 3:
+                self.assertEqual([p for p in pauses if p >= 1], [1, 2])
+
+    def test_modified_files_or_wrong_interval_are_rejected_before_network_or_backup(self):
+        for tamper in (False, True):
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp)/'history'
+                report = self.partial(path)
+                before = (path/'manifest.json').read_bytes()
+                if tamper:
+                    artifact = path/report['index_hours'][0]['file']
+                    artifact.write_bytes(artifact.read_bytes()+b'changed')
+                http = FakeHTTP()
+                with self.assertRaises(ValueError):
+                    fetch_history(path, start=(START+timedelta(hours=1)).isoformat() if not tamper else START.isoformat(),
+                                  hours=1, resume=True, now=NOW, http=http, pause=lambda _: None)
+                self.assertFalse(http.calls)
+                self.assertFalse(list(path.glob('manifest.before-resume-*')))
+                self.assertEqual((path/'manifest.json').read_bytes(), before)
+
+    def test_resuming_twice_retains_both_failures_and_reuses_all_saved_hours(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            self.partial(path)
+            class FailsLast(FakeHTTP):
+                def get(self, endpoint, params):
+                    if params['timestamp'] == (START+timedelta(hours=1)).isoformat(timespec='milliseconds').replace('+00:00', 'Z'):
+                        self.calls.append((endpoint, params))
+                        raise ProbeFailure('network_error')
+                    return super().get(endpoint, params)
+            first = download(path, FailsLast(), resume=True, retries=0)
+            self.assertEqual(first['status'], 'blocked')
+            self.assertEqual(first['reused_index_hours'], 1)
+            self.assertEqual(len(first['index_hours']), 2)
+            second = download(path, FakeHTTP(), resume=True)
+            self.assertEqual(second['reused_index_hours'], 2)
+            self.assertEqual(second['requests_this_run'], 1)
+            self.assertEqual(len(second['files']), 5)
+            self.assertEqual(len(second['resumptions']), 2)
+            self.assertTrue((path/'manifest.before-resume-0002.json').exists())
+            self.assertEqual(audit_dataset(path)['status'], 'computed')
+
+    def test_unregistered_index_is_never_replaced_and_incomplete_quotes_cannot_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            self.partial(path)
+            unregistered = path/'index'/START.strftime('%Y%m%dT%H.csv.gz')
+            unregistered.write_bytes(b'preserve-me')
+            http = FakeHTTP()
+            with self.assertRaisesRegex(ValueError, 'Unregistered'):
+                download(path, http, resume=True)
+            self.assertEqual(unregistered.read_bytes(), b'preserve-me')
+            self.assertFalse(http.calls)
+        class NoQuotes(FakeHTTP):
+            def get(self, endpoint, params):
+                if endpoint.endswith('/candlesticks'):
+                    raise ProbeFailure('network_error')
+                return super().get(endpoint, params)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            download(path, NoQuotes(), retries=0)
+            http = FakeHTTP()
+            with self.assertRaises(ValueError): download(path, http, resume=True)
+            self.assertFalse(http.calls)
+
+    def test_completed_but_interrupted_checkpoint_can_finalize_without_credentials(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            report = download(path)
+            report['status'] = 'interrupted'
+            save_json(path/'manifest.json', report)
+            with patch('kalshi_lab.history.load_kalshi_auth', side_effect=AssertionError('must not load credentials')):
+                result = fetch_history(path, start=START.isoformat(), hours=1, now=NOW, resume=True)
+            self.assertEqual(result['status'], 'downloaded')
+            self.assertEqual(result['requests_this_run'], 0)
+            self.assertEqual(result['reused_index_hours'], 3)
+
+    def test_invalid_retry_parameters_and_nonexistent_resume_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'history'
+            for kwargs in ({'retries': 3}, {'retries': True}, {'retries': -1}, {'resume': True}, {'resume': 1}):
+                with self.assertRaises(ValueError): download(path, FakeHTTP(), **kwargs)
+                self.assertFalse(path.exists())
 
 
 class SamplingTests(unittest.TestCase):
