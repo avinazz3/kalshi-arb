@@ -38,6 +38,13 @@ def main():
     p = sub.add_parser("audit", help="Offline settlement reconstruction under four explicit sampling/rounding hypotheses")
     p.add_argument("--run-dir", required=True)
     p.add_argument("--out", help="New audit JSON file; defaults to run-dir/settlement_audit.json")
+    p = sub.add_parser("forecast", help="Offline rolling/EWMA settlement forecasts and matched scoring")
+    p.add_argument("--run-dir", required=True)
+    p.add_argument("--out-dir", required=True)
+    p.add_argument("--lookback", type=int, default=60)
+    p.add_argument("--half-life", type=float, default=15)
+    p.add_argument("--paths", type=int, default=2000)
+    p.add_argument("--seed", type=int, default=1729)
     p = sub.add_parser("fees", help="Calculate fees from explicit policy and ordered fills")
     p.add_argument("--input", required=True)
     p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"))
@@ -63,6 +70,13 @@ def main():
             if Path(args.out).exists():
                 raise ValueError("Output already exists; choose a new path")
             result = audit_dataset(args.run_dir)
+        elif args.command == "forecast":
+            from .forecast import run_forecast
+            def progress(n, total):
+                if n % 4 == 0 or n == total:
+                    print(f"Forecasted {n}/{total} contracts", file=sys.stderr)
+            result = run_forecast(args.run_dir, args.out_dir, lookback=args.lookback,
+                                  half_life=args.half_life, paths=args.paths, seed=args.seed, progress=progress)
         else:
             document = json.loads(Path(args.input).read_text(), parse_float=str)
             result = calculate_orders(document, args.balance_precision)
@@ -79,9 +93,11 @@ def main():
             print(dump({key: result[key] for key in ("status", "contracts", "rule_review_required", "selected_candidate")} | {
                 "candidates": [{key: c[key] for key in ("boundary", "rounding", "counts")} for c in result["candidates"]],
                 "report": args.out}))
+        elif args.command == "forecast":
+            print(dump({k: result[k] for k in ("status", "forecast_rows", "paired_rows", "planned_rows", "scores", "exclusion_counts")} | {"report": str(Path(args.out_dir)/"report.json")}))
         else:
             print(dump(result))
-        expected = {"diagnose": "access_checks_passed", "history": "downloaded", "audit": "computed"}
+        expected = {"diagnose": "access_checks_passed", "history": "downloaded", "audit": "computed", "forecast": "completed"}
         return 2 if args.command in expected and result["status"] != expected[args.command] else 0
     except KeyboardInterrupt:
         print("Stopped.", file=sys.stderr)

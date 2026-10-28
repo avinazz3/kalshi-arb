@@ -49,7 +49,7 @@ def minute(points, end_ms, boundary, rounding):
     return result
 
 
-def audit_dataset(run_dir):
+def load_dataset(run_dir):
     directory = Path(run_dir)
     manifest = read_json(directory / 'manifest.json')
     if manifest.get('schema_version') != 1 or manifest.get('asset') != 'BTC' or manifest.get('index_id') != 'BRTI':
@@ -137,6 +137,18 @@ def audit_dataset(run_dir):
         seen.add(market['ticker'])
         by_open[stamp] = market
     missing = [t for t in expected_opens(start, end) if t not in by_open]
+    return dict(directory=directory, manifest=manifest, contracts=contracts, points=points,
+                index_quality=index_quality, missing=missing, settings=settings)
+
+
+def audit_dataset(run_dir):
+    return audit_loaded(load_dataset(run_dir))
+
+
+def audit_loaded(data):
+    directory, manifest, contracts, points, index_quality, missing, settings = (
+        data[k] for k in ('directory', 'manifest', 'contracts', 'points', 'index_quality', 'missing', 'settings'))
+    by_open = {int(parse_time(m['open_time']).timestamp()): m for m in contracts}
     candidates = []
     for boundary in ('right_closed', 'left_closed'):
         for rounding in ('half_up', 'half_even'):
