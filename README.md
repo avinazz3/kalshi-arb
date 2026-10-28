@@ -111,6 +111,19 @@ mismatch counts even when the command exits successfully. See the
 [historical-data workflow](docs/HISTORICAL_DATA.md) for files, limits, exit codes and
 remaining rule questions.
 
+If a download stops during the index phase after contracts and quotes were saved,
+version 0.6.1 can continue it without repeating completed downloads:
+
+```bash
+python -m kalshi_lab history --start 2026-10-25T00:00:00Z --hours 24 --run-dir data/history/btc-day-001 --resume --timeout 30
+python -m kalshi_lab audit --run-dir data/history/btc-day-001 --out data/history/btc-day-001/settlement_audit_completed.json
+```
+
+Use the original interval and warm-up. Saved artifacts are verified and preserved;
+only missing index hours are fetched. The prior manifest and audit report remain
+available. History requests now retry transient failures at most twice; use
+`--retries 0` to disable retries. See the historical-data guide for recovery limits.
+
 ## What happens after the settlement audit?
 
 1. Acquire compact historical index returns, frozen contract metadata, quotes and

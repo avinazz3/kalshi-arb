@@ -1,4 +1,4 @@
-"""Bounded retrospective BTC dataset. GET-only, sequential, no retries or orders."""
+"""Bounded retrospective BTC dataset. GET-only, sequential, bounded retries; no orders."""
 from datetime import datetime, timedelta, timezone
 import csv
 import gzip
@@ -104,27 +104,104 @@ def quote_rows(document, market):
     return sorted(rows, key=lambda row: row['end_period_ts'])
 
 
-def fetch_history(run_dir, *, start, hours=24, warmup_hours=1, timeout=10, http=None, now=None, pause=time.sleep):
+def prepare_resume(directory, start, end, hours, warmup_hours):
+    """Validate 0.6.0+ checkpoints before changing anything or making requests.
+
+    Only the index phase is resumable: freeze complete contracts and quotes,
+    verify saved artifacts, and fetch missing hours without refreshing old ones.
+    """
+    from .settlement import audit_dataset, read_json
+
+    manifest = directory / 'manifest.json'
+    if manifest.is_symlink() or manifest.stat().st_size > 8 * 1024 * 1024:
+        raise ValueError('Invalid resume manifest')
+    report = json.loads(manifest.read_text(encoding='utf-8'))
+    settings = report['settings']
+    if (parse_time(settings['start']) != start or parse_time(settings['end']) != end
+            or settings['hours'] != hours or settings['warmup_hours'] != warmup_hours):
+        raise ValueError('Resume interval and warm-up must match the original run')
+    if report['status'] not in ('blocked', 'interrupted', 'local_error', 'incomplete'):
+        raise ValueError('Resume requires an incomplete run; completed datasets can be audited directly')
+    checked = audit_dataset(directory)  # hashes, schedules, CSV schemas and every saved index row
+    if checked['contracts'] != hours * 4 or checked['missing_contract_opens_ts']:
+        raise ValueError('Resume requires complete frozen contracts; use a new run directory')
+    contracts = read_json(directory / 'contracts.json')
+    quotes = read_json(directory / 'quotes.json')
+    expected = {(m['ticker'], int(parse_time(m['open_time']).timestamp()) + 60*i)
+                for m in contracts for i in range(1, 16)}
+    if (not isinstance(quotes, list) or len(quotes) != len(expected)
+            or {(q['ticker'], q['end_period_ts']) for q in quotes} != expected
+            or any(q.get('two_sided') is not True or not 0 <= decimal(q['yes_bid_close']) <= decimal(q['yes_ask_close']) <= 1 for q in quotes)):
+        raise ValueError('Resume requires complete frozen quotes; use a new run directory')
+    if any(not issue.startswith('missing_whole_second_samples:') for issue in report['issues']):
+        raise ValueError('Resume cannot repair missing contracts or quotes; use a new run directory')
+    # Rebuild coverage from the verified data rather than trusting old counters.
+    saved = []
+    for quality in checked['index_quality']:
+        path = directory / quality['file']
+        if quality.get('missing_file'):
+            if path.exists() or path.is_symlink():
+                raise ValueError('Unregistered index file exists; preserve it and investigate before resuming')
+            continue
+        hour = datetime.strptime(path.name[:11], '%Y%m%dT%H').replace(tzinfo=timezone.utc)
+        saved.append({'hour': hour.isoformat(), **{k: v for k, v in quality.items() if k != 'missing_whole_seconds'}})
+    report['index_hours'] = saved
+    report['issues'] = ['missing_whole_second_samples:' + q['hour'] for q in saved if q['whole_second_samples'] != 3600]
+    report.update(contracts=len(contracts), quote_rows=len(quotes))
+    return report
+
+
+def fetch_history(run_dir, *, start, hours=24, warmup_hours=1, timeout=10, retries=2, resume=False,
+                  http=None, now=None, pause=time.sleep):
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise ValueError('now must be timezone-aware')
     start, end, first = window(start, hours, warmup_hours, now)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 30:
         raise ValueError('timeout must be from 1 to 30 seconds')
+    if isinstance(retries, bool) or not isinstance(retries, int) or not 0 <= retries <= 2:
+        raise ValueError('retries must be an integer from 0 to 2')
+    if not isinstance(resume, bool):
+        raise ValueError('resume must be boolean')
     directory = Path(run_dir)
-    if directory.exists():
-        raise ValueError('History run directory already exists; choose a new path')
-    if http is None:
+    if directory.exists() and not resume:
+        raise ValueError('History run directory already exists; use --resume or choose a new path')
+    if resume and not directory.is_dir():
+        raise ValueError('Resume run directory does not exist')
+    report = prepare_resume(directory, start, end, hours, warmup_hours) if resume else None
+    if http is None and (not resume or len(report['index_hours']) < hours + warmup_hours + 1):
         http = ProbeHTTP(load_kalshi_auth(), timeout)
-    directory.mkdir(parents=True, exist_ok=False)
-    (directory / 'index').mkdir()
-    report = {'schema_version': 1, 'package_version': __version__, 'asset': 'BTC', 'index_id': INDEX,
+    if resume:
+        # Preserve the exact previous manifest, including the failed request and
+        # its original hash, so prior audit reports remain traceable.
+        for number in range(1, 101):
+            backup = directory / f'manifest.before-resume-{number:04d}.json'
+            if not backup.exists():
+                break
+        else:
+            raise ValueError('Resume snapshot limit reached')
+        with backup.open('xb') as handle:
+            handle.write((directory / 'manifest.json').read_bytes())
+        report.setdefault('resumptions', []).append({'started_at': now.isoformat(), 'package_version': __version__,
+                                                    'previous_manifest': backup.name, 'previous_sha256': digest(backup),
+                                                    'timeout': timeout, 'retries': retries})
+        report.pop('failure', None)
+        report.pop('ended_at', None)
+        report['status'] = 'running'
+    else:
+        directory.mkdir(parents=True, exist_ok=False)
+        (directory / 'index').mkdir()
+        report = {'schema_version': 1, 'package_version': __version__, 'asset': 'BTC', 'index_id': INDEX,
               'started_at': now.isoformat(), 'status': 'running', 'synthetic': False,
               'settings': {'start': start.isoformat(), 'end': end.isoformat(), 'hours': hours,
-                           'warmup_hours': warmup_hours, 'timeout': timeout},
+                           'warmup_hours': warmup_hours, 'timeout': timeout, 'retries': retries},
               'requests': [], 'files': [], 'issues': [], 'index_hours': [],
               'rule_review_required': True, 'point_in_time_certified': False,
               'interpretation': 'Retrospective data and sampling audit only; not a backtest or executable quotes.'}
+    report['request_policy'] = {'timeout': timeout, 'retries': retries, 'retry_delays_seconds': [1, 2][:retries]}
+    report['requests_this_run'] = 0
+    report['reused_index_hours'] = len(report['index_hours'])
+    saved_files = {entry['path'] for entry in report['files']}
     markets, sources, quotes = {}, {}, []
     target_opens = expected_opens(start, end)
 
@@ -135,20 +212,26 @@ def fetch_history(run_dir, *, start, hours=24, warmup_hours=1, timeout=10, http=
         report['files'].append({'path': path.relative_to(directory).as_posix(), 'sha256': digest(path), 'bytes': path.stat().st_size})
 
     def get(path, params):
-        item = {'path': path, 'params': params, 'status': 'running'}
-        report['requests'].append(item)
-        checkpoint()
-        try:
-            if len(report['requests']) > 1:
-                pause(0.3)  # <= 3.34 requests/s even with zero network latency
-            response = http.get(path, params)
-            item.update(status='received', received_at=response.received_at, response_sha256=response.sha256)
-            return response.data
-        except ProbeFailure as exc:
-            item.update(status='blocked', reason=exc.reason, http_status=exc.status)
-            raise
-        finally:
+        for attempt in range(retries + 1):
+            item = {'path': path, 'params': params, 'status': 'running', 'attempt': attempt + 1, 'timeout': timeout}
+            report['requests'].append(item)
+            report['requests_this_run'] += 1
             checkpoint()
+            try:
+                if len(report['requests']) > 1:
+                    pause(0.3)  # rate limit applies to retries and resumed calls too
+                response = http.get(path, params)
+                item.update(status='received', received_at=response.received_at, response_sha256=response.sha256)
+                return response.data
+            except ProbeFailure as exc:
+                transient = exc.reason == 'network_error' or (exc.reason == 'http_error' and exc.status in (429, 500, 502, 503, 504))
+                retrying = transient and attempt < retries
+                item.update(status='retrying' if retrying else 'blocked', reason=exc.reason, http_status=exc.status)
+                if not retrying:
+                    raise
+            finally:
+                checkpoint()
+            pause(2 ** attempt)  # one then two seconds, at most two retries
 
     def listing(path, params):
         cursor, seen = '', set()
@@ -180,53 +263,64 @@ def fetch_history(run_dir, *, start, hours=24, warmup_hours=1, timeout=10, http=
 
     checkpoint()
     try:
-        # Close filters cannot be combined with status=settled. Locally validate
-        # results, schedules and the requested opening interval instead.
-        listing('/markets', {'series_ticker': SERIES, 'mve_filter': 'exclude', 'limit': 1000,
-                            'min_close_ts': int(start.timestamp()), 'max_close_ts': int(end.timestamp()) + 1})
-        observed = {int(parse_time(m['open_time']).timestamp()) for m in markets.values()}
-        if observed != set(target_opens):
-            # Historical listing has no time filters. Bound pagination explicitly;
-            # an exhausted page budget is a failure, never silent completeness.
-            listing('/historical/markets', {'series_ticker': SERIES, 'limit': 1000})
-        by_open = {}
-        for market in markets.values():
-            opened = int(parse_time(market['open_time']).timestamp())
-            if opened in by_open:
-                raise ProbeFailure('duplicate_contract_window')
-            by_open[opened] = market['ticker']
-        report['missing_contract_opens'] = [datetime.fromtimestamp(t, timezone.utc).isoformat() for t in target_opens if t not in by_open]
-        if report['missing_contract_opens']:
-            report['issues'].append('missing_contracts')
-        ordered = sorted(markets.values(), key=lambda m: m['open_time'])
-        save_json(directory / 'contracts.json', ordered)
-        register(directory / 'contracts.json')
-        for market in ordered:
-            prefix = '/historical/markets' if sources[market['ticker']] == '/historical/markets' else '/series/KXBTC15M/markets'
-            data = get(prefix + '/' + market['ticker'] + '/candlesticks',
-                       {'start_ts': int(parse_time(market['open_time']).timestamp()),
-                        'end_ts': int(parse_time(market['close_time']).timestamp()), 'period_interval': 1})
-            rows = quote_rows(data, market)
-            quotes.extend(rows)
-            if len(rows) != 15 or not all(row['two_sided'] for row in rows):
-                report['issues'].append('incomplete_quotes:' + market['ticker'])
-        save_json(directory / 'quotes.json', quotes)
-        register(directory / 'quotes.json')
+        if not resume:
+            # Close filters cannot be combined with status=settled. Locally validate
+            # results, schedules and the requested opening interval instead.
+            listing('/markets', {'series_ticker': SERIES, 'mve_filter': 'exclude', 'limit': 1000,
+                                'min_close_ts': int(start.timestamp()), 'max_close_ts': int(end.timestamp()) + 1})
+            observed = {int(parse_time(m['open_time']).timestamp()) for m in markets.values()}
+            if observed != set(target_opens):
+                # Historical listing has no time filters. Bound pagination explicitly;
+                # an exhausted page budget is a failure, never silent completeness.
+                listing('/historical/markets', {'series_ticker': SERIES, 'limit': 1000})
+            by_open = {}
+            for market in markets.values():
+                opened = int(parse_time(market['open_time']).timestamp())
+                if opened in by_open:
+                    raise ProbeFailure('duplicate_contract_window')
+                by_open[opened] = market['ticker']
+            report['missing_contract_opens'] = [datetime.fromtimestamp(t, timezone.utc).isoformat() for t in target_opens if t not in by_open]
+            if report['missing_contract_opens']:
+                report['issues'].append('missing_contracts')
+            ordered = sorted(markets.values(), key=lambda m: m['open_time'])
+            save_json(directory / 'contracts.json', ordered)
+            register(directory / 'contracts.json')
+            report['contracts'] = len(markets)
+            for market in ordered:
+                prefix = '/historical/markets' if sources[market['ticker']] == '/historical/markets' else '/series/KXBTC15M/markets'
+                data = get(prefix + '/' + market['ticker'] + '/candlesticks',
+                           {'start_ts': int(parse_time(market['open_time']).timestamp()),
+                            'end_ts': int(parse_time(market['close_time']).timestamp()), 'period_interval': 1})
+                rows = quote_rows(data, market)
+                quotes.extend(rows)
+                if len(rows) != 15 or not all(row['two_sided'] for row in rows):
+                    report['issues'].append('incomplete_quotes:' + market['ticker'])
+            save_json(directory / 'quotes.json', quotes)
+            register(directory / 'quotes.json')
+            report['quote_rows'] = len(quotes)
         # Include the entire hour containing the final close, whose :00 tick is
         # needed by the right-closed candidate; never extrapolate it.
         for offset in range(hours + warmup_hours + 1):
             hour = first + timedelta(hours=offset)
+            path = directory / 'index' / (hour.strftime('%Y%m%dT%H') + '.csv.gz')
+            if path.relative_to(directory).as_posix() in saved_files:
+                continue
+            if path.exists() or path.is_symlink() or not path.resolve().is_relative_to(directory.resolve()):
+                raise ValueError('Refusing to replace an unregistered index file')
             data = get('/cfbenchmarks/history/values', {'id': INDEX, 'timespan': 'HOUR',
                        'timestamp': hour.isoformat(timespec='milliseconds').replace('+00:00', 'Z')})
             points = index_points(data)
             lower = int(hour.timestamp() * 1000)
             if len(points) > 18000 or any(not lower <= p['time_ms'] < lower + 3600000 for p in points):
                 raise ProbeFailure('index_samples_outside_requested_hour_or_budget')
-            path = directory / 'index' / (hour.strftime('%Y%m%dT%H') + '.csv.gz')
-            with gzip.open(path, 'xt', newline='', encoding='utf-8') as handle:
+            temporary = path.with_suffix('.gz.tmp')
+            if temporary.is_symlink():
+                raise ValueError('Invalid temporary index path')
+            with gzip.open(temporary, 'wt', newline='', encoding='utf-8') as handle:
                 writer = csv.DictWriter(handle, fieldnames=INDEX_FIELDS)
                 writer.writeheader()
                 writer.writerows(points)
+            temporary.replace(path)
             register(path)
             whole_seconds = sum(p['time_ms'] % 1000 == 0 for p in points)
             summary = {'hour': hour.isoformat(), 'file': path.relative_to(directory).as_posix(),
@@ -239,8 +333,6 @@ def fetch_history(run_dir, *, start, hours=24, warmup_hours=1, timeout=10, http=
             if whole_seconds != 3600:
                 report['issues'].append('missing_whole_second_samples:' + summary['hour'])
             checkpoint()
-        report['contracts'] = len(markets)
-        report['quote_rows'] = len(quotes)
         report['status'] = 'downloaded' if not report['issues'] else 'incomplete'
     except ProbeFailure as exc:
         report.update(status='blocked', failure={'reason': exc.reason, 'http_status': exc.status})

@@ -44,10 +44,61 @@ for the requested number of hours. The normal one-day case is 96 contracts,
 (123 requests total). Archive fallback and pagination can increase this to 130
 with default warm-up. The absolute configured maximum is 153 requests with
 24 hours of warm-up. Requests are sequential with a 0.3-second minimum pause
-between calls; there are no retries, parallel sockets or order/account calls.
+between calls; there are no parallel sockets or order/account calls.
+By default each logical GET has at most **two extra attempts** (three total),
+with 1- then 2-second backoff, for network errors and HTTP 429/500/502/503/504.
+Use `--retries 0` to disable retries or `--retries 1` for one extra attempt.
+Each physical attempt retains its status in the manifest and obeys the 0.3-second
+pause. Auth failures, bad JSON/schemas, size limits and validation failures are
+not retried. Thus 153 logical requests can make at most 459 physical attempts
+with the largest configured interval/warm-up; a failed logical request stops the
+run after its bounded attempts.
 Each HTTP response is capped at 8 MiB. Timeout is per socket operation, not a
-whole-run deadline. A 429 or any failed request stops with a checkpoint; rerun
-in a new directory after investigating. Resuming is not implemented.
+whole-run deadline. A failed logical request stops with a checkpoint. Network errors are a broad
+category (for example, timeouts or connection problems); the report does not
+establish the precise cause. A larger `--timeout 30` can help slow responses but
+is not a guarantee of success. The supported index-phase resume is described below.
+
+## Recover an interrupted index download
+
+Version 0.6.1 can resume a **0.6.0 or newer** checkpoint after all contracts and
+quotes were frozen but some index hours are still missing. For the day command:
+
+```bash
+python -m kalshi_lab history --start 2026-10-25T00:00:00Z --hours 24 --run-dir data/history/btc-day-001 --resume --timeout 30
+python -m kalshi_lab audit --run-dir data/history/btc-day-001 --out data/history/btc-day-001/settlement_audit_completed.json
+```
+
+Keep the same start, duration and warm-up. Timeout and retry allowance may change.
+Before issuing any requests or changing the manifest, resume verifies saved file
+hashes and index rows, complete contract coverage, and complete valid frozen
+quotes. It reuses completed files byte-for-byte and fetches **only missing index
+hours**. A checkpoint with 16 of the default 26 hours therefore needs ten logical
+GETs, instead of repeating 96 contract candle downloads. `requests` is cumulative;
+`requests_this_run` and `reused_index_hours` distinguish the current invocation.
+The original acquisition settings remain frozen; `request_policy` and each
+resumption record show the timeout/retry settings actually used now.
+
+The exact previous manifest is retained as `manifest.before-resume-NNNN.json`,
+with its hash recorded in `resumptions`; original request receipt times and failed
+attempts remain available. Existing audit output is preserved: choose a **new
+`--out` filename** after completing the download. New index files are written to
+a temporary file before committing the completed gzip file. An abandoned internal
+`.gz.tmp` file may be replaced during resume; an unregistered final `.csv.gz` file
+is refused for investigation. Do not run multiple writers on the same directory.
+
+Resume does not repair missing contracts/quotes, replace saved hours containing
+gaps, or refresh earlier values to a newer revision. If the earlier phase failed,
+use a new run directory. Changed registered files, mismatched intervals and unknown
+final index files are refused. An interrupted run with every artifact already
+saved can be finalized without HTTP requests or credentials. A completed run does
+not need resuming: run `audit` directly. Up to 100 pre-resume manifest snapshots
+are allowed per dataset.
+
+Saved hours and newly retrieved hours can have different retrieval times and
+revision vintages. Those times remain in the request log; mixing them does not
+establish point-in-time availability or a uniform historical revision snapshot.
+The audit's sampling/rounding hypotheses and unresolved rule review are unchanged.
 
 ## Files and provenance
 

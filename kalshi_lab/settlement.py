@@ -97,7 +97,7 @@ def audit_dataset(run_dir):
         reader = csv.DictReader(io.StringIO(raw.decode('utf-8'), newline=''))
         if reader.fieldnames != INDEX_FIELDS:
             raise ValueError('Unexpected normalized index columns')
-        previous, count, whole, amended, repeated = None, 0, 0, 0, 0
+        previous, first_stamp, count, whole, amended, repeated = None, None, 0, 0, 0, 0
         max_gap = None
         lower = int(hour.timestamp() * 1000)
         for row in reader:
@@ -112,6 +112,8 @@ def audit_dataset(run_dir):
             if previous is not None:
                 gap = (stamp-previous)/1000
                 max_gap = gap if max_gap is None else max(max_gap, gap)
+            if first_stamp is None:
+                first_stamp = stamp
             previous = stamp
             amended += amend is not None
             repeated += repeat == 'True'
@@ -119,6 +121,7 @@ def audit_dataset(run_dir):
                 whole += 1
                 points[stamp] = {'value': str(value), 'amend_time_ms': amend, 'repeat_of_previous_value': repeat == 'True'}
         index_quality.append({'file': name, 'samples': count, 'whole_second_samples': whole,
+                              'first_time_ms': first_stamp, 'last_time_ms': previous,
                               'missing_whole_seconds': 3600-whole, 'amended_samples': amended,
                               'repeated_samples': repeated, 'max_gap_seconds': max_gap})
     by_open, seen = {}, set()
