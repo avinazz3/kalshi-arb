@@ -158,3 +158,15 @@ python -m kalshi_lab fees --input examples/fee_orders.json --balance-precision 0
 GitHub Actions runs offline tests and examples on Python 3.10, 3.12 and 3.14.
 Tests use generated keys and mocked transport; no live credentials are required.
 Primary references and access dates are in [SOURCES.md](docs/SOURCES.md).
+
+## Offline probability forecasts
+
+The rolling/EWMA experiment is now available after a complete settlement audit:
+
+```bash
+python -m kalshi_lab forecast --run-dir data/history/btc-day-001 --out-dir data/forecasts/btc-day-001
+```
+
+It produces prediction records, matched evaluation rows and scores at 10, 5 and
+2 minutes before close. See [FORECASTING.md](docs/FORECASTING.md) for assumptions,
+Monte Carlo precision, exclusions and retrospective availability limitations.
