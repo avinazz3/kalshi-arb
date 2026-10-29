@@ -45,6 +45,10 @@ def main():
     p.add_argument("--half-life", type=float, default=15)
     p.add_argument("--paths", type=int, default=2000)
     p.add_argument("--seed", type=int, default=1729)
+    p = sub.add_parser("analyze", help="Offline diagnostics of existing forecasts; no refitting or simulation")
+    p.add_argument("--run-dir", required=True, help="Historical dataset used by the forecasts")
+    p.add_argument("--forecast-dir", required=True, help="Finished forecast run with saved predictions and evaluation")
+    p.add_argument("--out-dir", required=True, help="New directory for diagnostics")
     p = sub.add_parser("fees", help="Calculate fees from explicit policy and ordered fills")
     p.add_argument("--input", required=True)
     p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"))
@@ -77,6 +81,9 @@ def main():
                     print(f"Forecasted {n}/{total} contracts", file=sys.stderr)
             result = run_forecast(args.run_dir, args.out_dir, lookback=args.lookback,
                                   half_life=args.half_life, paths=args.paths, seed=args.seed, progress=progress)
+        elif args.command == "analyze":
+            from .analysis import run_analysis
+            result = run_analysis(args.run_dir, args.forecast_dir, args.out_dir)
         else:
             document = json.loads(Path(args.input).read_text(), parse_float=str)
             result = calculate_orders(document, args.balance_precision)
@@ -95,6 +102,8 @@ def main():
                 "report": args.out}))
         elif args.command == "forecast":
             print(dump({k: result[k] for k in ("status", "forecast_rows", "paired_rows", "planned_rows", "scores", "exclusion_counts")} | {"report": str(Path(args.out_dir)/"report.json")}))
+        elif args.command == "analyze":
+            print(dump({k: result[k] for k in ("status", "rows", "contracts", "source_status", "unpaired_predictions", "scores")} | {"summary": str(Path(args.out_dir)/"summary.md"), "report": str(Path(args.out_dir)/"report.json")}))
         else:
             print(dump(result))
         expected = {"diagnose": "access_checks_passed", "history": "downloaded", "audit": "computed", "forecast": "completed"}

@@ -134,11 +134,13 @@ available. History requests now retry transient failures at most twice; use
 4. Compare probability scores and calibration on chronological held-out contracts.
 5. Assess executable prices, fees, delays and size separately if forecasts warrant it.
 
-No historical forecasting scores or net-profit claims exist in this milestone.
+The forecast and diagnostic commands below implement the retrospective experiment.
+No held-out performance or net-profit claim is established by those commands.
 
 ## Repository scope
 
-This repository exposes `digital`, `diagnose`, `history`, `audit` and `fees`.
+This repository exposes `digital`, `diagnose`, `history`, `audit`, `forecast`,
+`analyze` and `fees`.
 REST signing and metadata helpers support read-only data access. The old
 order-flow collector, book reconstruction, quote-change datasets, demos and their
 guides have been removed from the active code; Git history retains them. Existing
@@ -170,3 +172,14 @@ python -m kalshi_lab forecast --run-dir data/history/btc-day-001 --out-dir data/
 It produces prediction records, matched evaluation rows and scores at 10, 5 and
 2 minutes before close. See [FORECASTING.md](docs/FORECASTING.md) for assumptions,
 Monte Carlo precision, exclusions and retrospective availability limitations.
+
+Inspect an existing run without rerunning simulations or changing the model:
+
+```bash
+python -m kalshi_lab analyze --run-dir data/history/btc-day-001 --forecast-dir data/forecasts/btc-day-001 --out-dir data/analysis/btc-day-001
+```
+
+Open `data/analysis/btc-day-001/summary.md` for paired losses, the largest errors
+and calibration by horizon. Detailed rows and past-return/standardized-gap panels
+are saved alongside it. See [FORECAST_DIAGNOSTICS.md](docs/FORECAST_DIAGNOSTICS.md)
+for field definitions and interpretation.
