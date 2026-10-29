@@ -1,0 +1,9 @@
+{
+  "policy": {"model": "quadratic", "taker_multiplier": "1", "maker_multiplier": "0"},
+  "balance_precision": "0.0001",
+  "quantity": "1.00",
+  "minimum_net_edge_per_contract": "0.03",
+  "latency_ms": 1000,
+  "max_wait_ms": 5000,
+  "max_slippage_dollars": "0.01"
+}

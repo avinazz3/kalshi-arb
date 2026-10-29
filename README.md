@@ -140,7 +140,7 @@ No held-out performance or net-profit claim is established by those commands.
 ## Repository scope
 
 This repository exposes `digital`, `diagnose`, `history`, `audit`, `forecast`,
-`analyze` and `fees`.
+`analyze`, `compare`, `batch`, `shadow`, `paper` and `fees`.
 REST signing and metadata helpers support read-only data access. The old
 order-flow collector, book reconstruction, quote-change datasets, demos and their
 guides have been removed from the active code; Git history retains them. Existing
@@ -183,3 +183,29 @@ Open `data/analysis/btc-day-001/summary.md` for paired losses, the largest error
 and calibration by horizon. Detailed rows and past-return/standardized-gap panels
 are saved alongside it. See [FORECAST_DIAGNOSTICS.md](docs/FORECAST_DIAGNOSTICS.md)
 for field definitions and interpretation.
+
+## Multi-day evaluation and live observation
+
+Version 0.9 can reuse completed daily runs and evaluate a larger fixed-model sample:
+
+```bash
+python -m kalshi_lab batch --start 2026-10-25T00:00:00Z --days 4 --root-dir data --out-dir data/batches/first-four-days
+```
+
+It recognizes existing `btc-day-001`/`btc-day-002` histories by their intervals,
+verifies and reuses matching forecasts/analyses, and downloads only missing days.
+The output comparison keeps daily and pooled scores, calibration, feature panels,
+and paired day-block uncertainty when enough days exist.
+
+To record a bounded live sample with local receipt times and hypothetical forecasts:
+
+```bash
+python -m kalshi_lab shadow --run-dir data/shadow/btc-live-001 --minutes 120
+```
+
+This needs the same local data-access credentials as `history` and the `[data]`
+extra. It records BRTI, rules/references, bid/ask depth, availability gaps and
+forecast completion times. No orders are placed. Offline `paper` evaluation uses
+an explicitly supplied fee/latency/depth scenario after settlement labels arrive.
+See [MULTIDAY_AND_SHADOW.md](docs/MULTIDAY_AND_SHADOW.md) for all four commands,
+warm-up requirements, reuse behavior, assumptions, output files and exit codes.

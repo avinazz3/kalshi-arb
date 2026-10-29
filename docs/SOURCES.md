@@ -75,3 +75,20 @@ Historical-data milestone (checked 2026-10-27):
 
 The audit's four sampling/rounding cases are engineering sensitivity hypotheses,
 not a claimed result from a paper or a certified Kalshi settlement implementation.
+
+## Multi-day and live observation additions — checked 2026-10-29
+
+- [Orderbook responses](https://docs.kalshi.com/getting_started/orderbook_responses):
+  fixed-point dollar/count strings; YES/NO bid ladders imply opposite-side asks.
+- [Get market orderbook](https://docs.kalshi.com/api-reference/market/get-market-orderbook):
+  current REST snapshot and bounded depth parameter. The recorder sorts parsed
+  prices explicitly rather than depending on prose descriptions of array ordering.
+- [CF REST passthrough](https://docs.kalshi.com/cfbenchmarks/rest-passthrough):
+  authenticated entitled access, wrapped CF payloads, history forwarding and higher
+  read-budget cost. The recorder reuses the existing tested latest/history schemas.
+
+Day-block bootstrap intervals are exploratory paired resampling diagnostics, with
+the exact algorithm, minimum-data guard and limitations described in
+[MULTIDAY_AND_SHADOW.md](MULTIDAY_AND_SHADOW.md). No inferential result is claimed
+from two days. Paper fills and fee multipliers are explicit scenario assumptions,
+not exchange guarantees or empirically established trading performance.
