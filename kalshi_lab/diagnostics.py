@@ -55,8 +55,11 @@ class ProbeHTTP:
         self.signer, self.timeout = signer, timeout
         self.opener = build_opener(NoRedirect())
 
+    def allowed_path(self, path):
+        return path in PUBLIC_PATHS | INDEX_PATHS or bool(CANDLE_PATH.fullmatch(path))
+
     def get(self, path, params=None):
-        if path not in PUBLIC_PATHS | INDEX_PATHS and not CANDLE_PATH.fullmatch(path):
+        if not self.allowed_path(path):
             raise ValueError("Endpoint is outside the read-only diagnostic allowlist")
         headers = {"Accept": "application/json", "User-Agent": "kalshi-lab/" + __version__}
         if path in INDEX_PATHS:

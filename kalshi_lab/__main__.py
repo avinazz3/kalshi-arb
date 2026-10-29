@@ -49,6 +49,30 @@ def main():
     p.add_argument("--run-dir", required=True, help="Historical dataset used by the forecasts")
     p.add_argument("--forecast-dir", required=True, help="Finished forecast run with saved predictions and evaluation")
     p.add_argument("--out-dir", required=True, help="New directory for diagnostics")
+    p = sub.add_parser("compare", help="Pool verified analysis runs with daily scores and day-block uncertainty")
+    p.add_argument("--analysis-dirs", nargs="+", required=True)
+    p.add_argument("--out-dir", required=True)
+    p.add_argument("--block-days", type=int, default=2)
+    p.add_argument("--bootstrap-samples", type=int, default=2000)
+    p.add_argument("--bootstrap-seed", type=int, default=314159)
+    p = sub.add_parser("batch", help="Download, audit, forecast and compare consecutive UTC days with verified reuse")
+    p.add_argument("--start", required=True)
+    p.add_argument("--days", type=int, default=2)
+    p.add_argument("--root-dir", default="data")
+    p.add_argument("--out-dir", required=True)
+    p.add_argument("--paths", type=int, default=2000)
+    p = sub.add_parser("shadow", help="Bounded live REST recording and hypothetical forecasts; no orders")
+    p.add_argument("--run-dir", required=True)
+    p.add_argument("--minutes", type=int, default=60)
+    p.add_argument("--interval", type=float, default=0.5)
+    p.add_argument("--timeout", type=float, default=10)
+    p.add_argument("--paths", type=int, default=2000)
+    p.add_argument("--no-bootstrap-history", action="store_true")
+    p = sub.add_parser("paper", help="Offline latency/depth/fee scenarios on a finished shadow recording")
+    p.add_argument("--shadow-dir", required=True)
+    p.add_argument("--run-dir", action="append", required=True, help="Historical label dataset; repeat for multiple days")
+    p.add_argument("--policy", required=True, help="Explicit hypothetical fee and fill assumptions JSON")
+    p.add_argument("--out-dir", required=True)
     p = sub.add_parser("fees", help="Calculate fees from explicit policy and ordered fills")
     p.add_argument("--input", required=True)
     p.add_argument("--balance-precision", required=True, choices=("0.0001", "0.01"))
@@ -84,6 +108,22 @@ def main():
         elif args.command == "analyze":
             from .analysis import run_analysis
             result = run_analysis(args.run_dir, args.forecast_dir, args.out_dir)
+        elif args.command == "compare":
+            from .compare import run_compare
+            result = run_compare(args.analysis_dirs, args.out_dir, block_days=args.block_days,
+                                 samples=args.bootstrap_samples, seed=args.bootstrap_seed)
+        elif args.command == "batch":
+            from .batch import run_batch
+            result = run_batch(args.start, args.days, args.root_dir, args.out_dir, paths=args.paths,
+                               progress=lambda n, total: print(f"Completed {n}/{total} UTC days", file=sys.stderr))
+        elif args.command == "shadow":
+            from .shadow import run_shadow
+            result = run_shadow(args.run_dir, minutes=args.minutes, interval=args.interval, timeout=args.timeout,
+                                paths=args.paths, bootstrap_history=not args.no_bootstrap_history,
+                                progress=lambda n, p: print(f"Recorded {n} observations; {p} forecasts", file=sys.stderr))
+        elif args.command == "paper":
+            from .paper import run_paper
+            result = run_paper(args.shadow_dir, args.run_dir, args.policy, args.out_dir)
         else:
             document = json.loads(Path(args.input).read_text(), parse_float=str)
             result = calculate_orders(document, args.balance_precision)
@@ -104,9 +144,15 @@ def main():
             print(dump({k: result[k] for k in ("status", "forecast_rows", "paired_rows", "planned_rows", "scores", "exclusion_counts")} | {"report": str(Path(args.out_dir)/"report.json")}))
         elif args.command == "analyze":
             print(dump({k: result[k] for k in ("status", "rows", "contracts", "source_status", "unpaired_predictions", "scores")} | {"summary": str(Path(args.out_dir)/"summary.md"), "report": str(Path(args.out_dir)/"report.json")}))
+        elif args.command == "compare":
+            print(dump({k: result[k] for k in ("status", "rows", "contracts", "utc_days", "scores", "bootstrap")} | {"summary": str(Path(args.out_dir)/"summary.md")}))
+        elif args.command == "batch":
+            print(dump(result))
+        elif args.command == "shadow":
+            print(dump(result))
         else:
             print(dump(result))
-        expected = {"diagnose": "access_checks_passed", "history": "downloaded", "audit": "computed", "forecast": "completed"}
+        expected = {"diagnose": "access_checks_passed", "history": "downloaded", "audit": "computed", "forecast": "completed", "shadow": "completed"}
         return 2 if args.command in expected and result["status"] != expected[args.command] else 0
     except KeyboardInterrupt:
         print("Stopped.", file=sys.stderr)

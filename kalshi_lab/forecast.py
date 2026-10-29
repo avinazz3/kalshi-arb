@@ -29,6 +29,16 @@ def predict(points, *, ticker, reference, comparison, close_ts, horizon, lookbac
     """Inputs only; neither labels nor post-decision prices enter calculations."""
     decision = close_ts - horizon*60
     source = decision - 1  # exact tick strictly preceding nominal decision
+    return predict_at(points, ticker=ticker, reference=reference, comparison=comparison,
+                      close_ts=close_ts, horizon=horizon, decision=decision, source=source,
+                      lookback=lookback, half_life=half_life, paths=paths, seed=seed)
+
+
+def predict_at(points, *, ticker, reference, comparison, close_ts, horizon, decision,
+               source, lookback=60, half_life=15, paths=2000, seed=1729):
+    """Same fixed model with explicit actual decision/source times for live records."""
+    if any(type(t) is not int for t in (close_ts, decision, source)) or not source < decision < close_ts - 60:
+        raise ValueError('Require source < decision before the final averaging minute')
     stamps = [source-60*i for i in range(lookback, -1, -1)]
     if any(t*1000 not in points for t in stamps):
         raise Unavailable('missing_input_sample')
