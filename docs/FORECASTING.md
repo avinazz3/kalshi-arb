@@ -55,6 +55,10 @@ are selected from outcomes. The three forecasts per contract share one outcome;
 Use this day to verify machinery, then freeze settings and evaluate untouched later
 days. No execution, fees-based trading evaluation or automatic tuning is included.
 
+To inspect saved forecasts without rerunning them, use the
+[`analyze` command](FORECAST_DIAGNOSTICS.md). It produces paired excess losses,
+calibration by horizon, and past-return/settlement-uncertainty diagnostics.
+
 References: RiskMetrics Technical Document (1996), section 5.2, for exponential
 weighting (https://www.msci.com/documents/10199/5915b101-4206-4ba0-aee2-3449d5c7e95a);
 Gneiting and Raftery (2007) for proper probability scores
