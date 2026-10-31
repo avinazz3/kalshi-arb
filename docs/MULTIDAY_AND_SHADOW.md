@@ -83,18 +83,22 @@ python -m kalshi_lab shadow --run-dir data/shadow/btc-live-001 --minutes 120
 
 The recorder is a bounded foreground process. It does not set a scheduled task.
 Use a separate terminal if you also run a historical batch. It follows the active
-KXBTC15M contract through rollovers, queries current BRTI and up to ten bid levels
-per YES/NO side, and preserves public rules/reference snapshots. It uses only
-allowlisted GET endpoints. Credential identifiers, key paths, authentication
+KXBTC15M contract through rollovers, streams BRTI on an independent background
+thread and queries up to ten bid levels per YES/NO side using existing REST code.
+`websocket-client` handles framing, ping/pong and reconnects. The sole WebSocket
+subscription is `cfbenchmarks_value` for BRTI; REST uses allowlisted GET endpoints.
+Credential identifiers, key paths, authentication
 headers, raw HTTP bodies and upstream error messages are not written.
 
 Default cycle interval is 0.5 seconds, compensating for time spent requesting and
 processing data. A cycle runs more slowly if requests take longer. `--interval`
 accepts 0.5–10 seconds. Requests are sequential with a 1–30 second socket timeout;
-there is no per-poll retry loop. CF requests have a higher read-budget cost than
-ordinary market requests, so interval/rate-limit errors should be monitored.
-The time budget stops new requests; one in-flight request can finish after the
-nominal deadline. Output and request counts are bounded. Ctrl-C flushes artifacts
+there is no per-poll retry loop. Slow book requests do not block index ingestion.
+Both wall-clock and monotonic deadlines stop new requests; one in-flight request
+can finish late. Laptop sleep cannot be prevented by Python: on macOS run with
+`caffeinate -i python -m kalshi_lab shadow ...` and keep the lid open. Long requests
+and collection pauses are reported; retained input history is cleared after a pause.
+Output, the stream queue and request counts are bounded. Ctrl-C flushes artifacts
 and checkpoints an interrupted report; use a new directory to restart.
 
 `observations.jsonl` records normalized index points, market metadata, bid ladders
@@ -105,12 +109,25 @@ books are rejected, and no integer-cent/fixed-point unit guessing occurs.
 `decisions.jsonl` logs a forecast or an explicit unavailability reason at each
 observed contract's nominal 10/5/2-minute decision.
 
-At startup, three bounded CF hour requests bootstrap earlier/current-hour history.
+The default is live-only collection with at least one hour of warm-up. First run
+`python -m kalshi_lab shadow --run-dir data/shadow/check-001 --minutes 2` and inspect
+`report.json`: `stream_samples` must increase and `coverage` lists received versus
+61 required minute endpoints, missing timestamps, index age and readiness. This
+short check normally produces zero forecasts and exits 2. No stream ticks within
+30 seconds fails early instead of spending hours collecting only books.
+
+Optional `--bootstrap-history` makes three bounded CF hour requests at startup.
 These points get their **actual current receipt time**, not their old publication
 time. Forecasts only use points received by calculation start. Current history
 may lag, so initial forecasts can lack endpoints until live observations cover
-the gap. `--no-bootstrap-history` starts from live data only and normally requires
-at least an hour of warm-up. Polling gaps can still cause missing exact endpoints.
+the gap. It does not guarantee immediate forecasts. Reconnects and upstream gaps
+can still leave missing exact endpoints. No gap is silently filled.
+
+Stream frames retain their socket receipt time in `stream_received_at`. For
+compatibility with existing paper replay, `received_at` is conservatively the
+later time the main loop drains and records the tick, before forecast calculation.
+Only raw upstream values are used; the feed's supplied average fields do not
+replace the audited settlement calculation. Stream errors are sanitized.
 
 At a due decision, the latest whole-second source strictly before calculation
 start must be no more than three seconds old. All 61 exact minute-spaced input
@@ -128,9 +145,9 @@ forecasts for that contract and remain recorded. Past missed decisions are logge
 once as missed rather than fabricated from newly fetched data.
 
 `report.json` records readiness, counts, errors, exclusions and artifact hashes.
-Exit 0 means the recording finished without acquisition errors; exit 2 means it
-finished with gaps; Ctrl-C exits 130. Successful recording can still produce no
-forecasts when exact input endpoints are missing. Local receipt evidence is useful,
+Exit 0 means the recording finished with forecasts and no acquisition or decision
+gaps; exit 2 includes warm-up-only runs and zero forecasts; Ctrl-C exits 130.
+`wall_elapsed_seconds` reports actual wall duration. Local receipt evidence is useful,
 but the tool retains `point_in_time_certified=false`: it cannot certify clocks,
 server caching, publication timestamps or the exchange's true book-update time.
 

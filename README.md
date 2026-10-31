@@ -25,8 +25,8 @@ python tests/run_checks.py
 
 If your virtual environment already exists, activate it and reinstall instead of
 creating it again. The digital benchmark uses the standard library. The optional
-`data` extra installs cryptography for authenticated REST data checks and the full
-test suite. There is no WebSocket dependency. Keep the distribution name
+`data` extra installs cryptography for authentication and websocket-client for
+the live BRTI feed. Keep the distribution name
 `kalshi-crypto-flow` for
 installation continuity; the import `kalshi_lab` and command `kalshi-lab` are stable.
 
@@ -147,7 +147,7 @@ guides have been removed from the active code; Git history retains them. Existin
 local pilot files under `data/` are not deleted or migrated by this cleanup. Use
 the earlier revision in a separate checkout if you need the retired commands.
 
-Install `.[data]` for authenticated REST data access. The former `stream` extra
+Install `.[data]` for authenticated REST and WebSocket data access. The former `stream` extra
 has been removed. The package/import names are stable, so an existing checkout
 and virtual environment can be updated with the installation command above.
 

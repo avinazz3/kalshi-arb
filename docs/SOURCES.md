@@ -78,6 +78,12 @@ not a claimed result from a paper or a certified Kalshi settlement implementatio
 
 ## Multi-day and live observation additions — checked 2026-10-29
 
+Live ingestion update checked 2026-10-31:
+- https://docs.kalshi.com/websockets/cfbenchmarks-value — BRTI subscription and raw upstream frame.
+- https://docs.kalshi.com/getting_started/quick_start_websockets — GET signing of `/trade-api/ws/v2`.
+- https://websocket-client.readthedocs.io/en/latest/app.html — library callbacks, fresh handshake headers, reconnect and heartbeat.
+The collector uses the raw upstream tick, not the feed's derived average fields.
+
 - [Orderbook responses](https://docs.kalshi.com/getting_started/orderbook_responses):
   fixed-point dollar/count strings; YES/NO bid ladders imply opposite-side asks.
 - [Get market orderbook](https://docs.kalshi.com/api-reference/market/get-market-orderbook):

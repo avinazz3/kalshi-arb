@@ -61,13 +61,17 @@ def main():
     p.add_argument("--root-dir", default="data")
     p.add_argument("--out-dir", required=True)
     p.add_argument("--paths", type=int, default=2000)
-    p = sub.add_parser("shadow", help="Bounded live REST recording and hypothetical forecasts; no orders")
+    p = sub.add_parser("shadow", help="Stream BRTI, record REST books and hypothetical forecasts; no orders")
     p.add_argument("--run-dir", required=True)
     p.add_argument("--minutes", type=int, default=60)
     p.add_argument("--interval", type=float, default=0.5)
     p.add_argument("--timeout", type=float, default=10)
     p.add_argument("--paths", type=int, default=2000)
-    p.add_argument("--no-bootstrap-history", action="store_true")
+    bootstrap = p.add_mutually_exclusive_group()
+    bootstrap.add_argument("--bootstrap-history", dest="bootstrap_history", action="store_true",
+                           help="Optionally seed historical prices; recent history may be delayed")
+    bootstrap.add_argument("--no-bootstrap-history", dest="bootstrap_history", action="store_false")
+    p.set_defaults(bootstrap_history=False)
     p = sub.add_parser("paper", help="Offline latency/depth/fee scenarios on a finished shadow recording")
     p.add_argument("--shadow-dir", required=True)
     p.add_argument("--run-dir", action="append", required=True, help="Historical label dataset; repeat for multiple days")
@@ -119,7 +123,7 @@ def main():
         elif args.command == "shadow":
             from .shadow import run_shadow
             result = run_shadow(args.run_dir, minutes=args.minutes, interval=args.interval, timeout=args.timeout,
-                                paths=args.paths, bootstrap_history=not args.no_bootstrap_history,
+                                paths=args.paths, bootstrap_history=args.bootstrap_history,
                                 progress=lambda n, p: print(f"Recorded {n} observations; {p} forecasts", file=sys.stderr))
         elif args.command == "paper":
             from .paper import run_paper

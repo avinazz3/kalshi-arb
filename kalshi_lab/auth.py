@@ -27,7 +27,7 @@ def load_kalshi_auth():
 def kalshi_headers(key_id, private_key, timestamp_ms=None, *, path):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding, rsa, ed25519
-    if not path.startswith("/trade-api/v2/") or "?" in path or "#" in path:
+    if (not path.startswith("/trade-api/v2/") and path != "/trade-api/ws/v2") or "?" in path or "#" in path:
         raise ValueError("Sign a Kalshi REST API path without query parameters")
     timestamp = str(int(time.time() * 1000) if timestamp_ms is None else timestamp_ms)
     message = (timestamp + "GET" + path).encode()
