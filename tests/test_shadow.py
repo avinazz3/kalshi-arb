@@ -90,7 +90,7 @@ class ShadowTests(unittest.TestCase):
             clock = FakeClock(START + timedelta(minutes=4, seconds=55))
             http = LiveHTTP(clock)
             root = Path(tmp)/'shadow'
-            result = run_shadow(root, minutes=1, paths=100, http=http, clock=clock.clock,
+            result = run_shadow(root, minutes=1, paths=100, bootstrap_history=True, http=http, clock=clock.clock,
                                 monotonic=clock.monotonic, pause=clock.pause)
             self.assertEqual(result['status'], 'completed')
             self.assertEqual(result['predictions'], 1)
@@ -137,7 +137,7 @@ class ShadowTests(unittest.TestCase):
             root=Path(tmp)/'shadow'
             result=run_shadow(root,minutes=1,paths=100,http=RolloverHTTP(clock),clock=clock.clock,
                               monotonic=clock.monotonic,pause=clock.pause)
-            self.assertEqual(result['status'],'completed')
+            self.assertEqual(result['status'],'completed_with_gaps')
             events=[json.loads(s) for s in (root/'observations.jsonl').read_text().splitlines()]
             self.assertEqual({e['value']['ticker'] for e in events if e['kind']=='book'}, {market(0)['ticker'],market(1)['ticker']})
             self.assertTrue(all('result' not in e['value'] for e in events if e['kind']=='market'))

@@ -17,7 +17,7 @@ class PaperTests(unittest.TestCase):
     def fixture(self, root):
         download(root/'history')
         clock=FakeClock(START+timedelta(minutes=4,seconds=55))
-        run_shadow(root/'shadow',minutes=1,paths=100,http=LiveHTTP(clock),clock=clock.clock,
+        run_shadow(root/'shadow',minutes=1,paths=100,bootstrap_history=True,http=LiveHTTP(clock),clock=clock.clock,
                    monotonic=clock.monotonic,pause=clock.pause)
         policy = json.loads(Path('examples/paper_policy.json').read_text())
         (root/'policy.json').write_text(json.dumps(policy))
