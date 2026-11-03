@@ -112,3 +112,50 @@ class StreamTests(unittest.TestCase):
             self.assertLess(clock.elapsed, 32)
             self.assertTrue(stream.closed)
             self.assertEqual(json.loads((root/'report.json').read_text())['status'], 'failed')
+
+    def test_rejected_timestamps_are_recorded_separately_and_never_used(self):
+        clock = FakeClock(START+timedelta(minutes=4, seconds=55))
+        class Stream:
+            first = True
+            rejected = set()
+            def start(self): pass
+            def close(self): pass
+            def drain(self):
+                received = clock.clock().isoformat()
+                base = int(clock.clock().timestamp())*1000
+                stamps = [base-1000]
+                if self.first:
+                    # Past fractional timestamp, future whole timestamp, and both.
+                    self.rejected = {base-250, base+1000, base+1250}
+                    stamps += sorted(self.rejected)
+                    self.first = False
+                rejected_this_batch = set(stamps[1:])
+                for stamp in stamps:
+                    yield {'value': [{'time_ms':stamp, 'value':'100.00',
+                                     'amend_time_ms':None, 'repeat_of_previous_value':False}],
+                           'stream_received_at':received,
+                           'response_sha256':'rejected-frame' if stamp in rejected_this_batch else 'accepted-frame'}
+        stream = Stream()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'run'
+            report = run_shadow(root, minutes=1, paths=100, stream=stream, http=LiveHTTP(clock),
+                                clock=clock.clock, monotonic=clock.monotonic, pause=clock.pause)
+            checks = report['stream_timestamp_checks']
+            self.assertEqual(checks['rejected_samples'], 3)
+            self.assertEqual(checks['future_timestamp'], 2)
+            self.assertEqual(checks['nonwhole_timestamp'], 2)
+            self.assertEqual(report['errors']['stream:future_timestamp'], 2)
+            self.assertEqual(report['errors']['stream:nonwhole_timestamp'], 2)
+            self.assertEqual(len(checks['rejected_examples']), 3)
+            events = [json.loads(s) for s in (root/'observations.jsonl').read_text().splitlines()]
+            rejected = [e for e in events if e.get('reason')=='rejected_index_sample']
+            self.assertEqual(len(rejected), 3)
+            self.assertEqual({e['timestamp_checks'][0]['source_time_ms'] for e in rejected}, stream.rejected)
+            self.assertTrue(all('stream_received_at' in e and 'response_sha256' in e for e in rejected))
+            for event in events:
+                if event['kind']=='index':
+                    self.assertEqual(event['response_sha256'], 'accepted-frame')
+            self.assertEqual(checks['checked_samples'], report['stream_samples']+3)
+            self.assertLess(checks['min_source_minus_receipt_ms'], 0)
+            self.assertGreater(checks['max_source_minus_receipt_ms'], 0)
+            self.assertEqual(report['predictions'], 0)
