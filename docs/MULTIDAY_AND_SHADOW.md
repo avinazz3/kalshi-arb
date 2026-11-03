@@ -151,6 +151,29 @@ gaps; exit 2 includes warm-up-only runs and zero forecasts; Ctrl-C exits 130.
 but the tool retains `point_in_time_certified=false`: it cannot certify clocks,
 server caching, publication timestamps or the exchange's true book-update time.
 
+## Short timestamp diagnostic (0.9.2)
+
+Before another long recording, use a fresh directory:
+
+```bash
+caffeinate -i python -m kalshi_lab shadow --run-dir data/shadow/timestamp-check-001 --minutes 5
+```
+
+On systems without macOS `caffeinate`, run the Python command directly and prevent
+sleep through the operating system. Forecast warm-up is not needed to test timestamps.
+The normal recording updates `report.json` every cycle. Its `stream_timestamp_checks`
+contains checked/rejected sample counts, separate future/non-whole-second counts,
+minimum/maximum source-minus-socket-receipt milliseconds, and the first ten rejected
+examples. A positive difference means the source timestamp was ahead of local receipt.
+A sample can count in both rejection categories; `rejected_samples` counts it once.
+Every rejected frame is retained as an `error` observation with `reasons`, exact
+`source_time_ms`, `stream_received_at`, timestamp differences and the response hash.
+Rejected samples are still excluded from forecast inputs; neither timestamps nor
+acceptance rules are changed. Raw frames and authentication headers are not saved.
+Zero forecasts and exit 2 are normal during this short live-only warm-up run.
+If the short run has no rejections, that verifies healthy timestamps in that window,
+not an explanation for earlier intermittent failures.
+
 ## Evaluate hypothetical trades after labels become available
 
 After the recording ends, download/audit the historical UTC day(s) containing its

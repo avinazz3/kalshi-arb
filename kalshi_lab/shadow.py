@@ -117,6 +117,11 @@ def run_shadow(run_dir, *, minutes=60, interval=0.5, timeout=10, paths=2000, boo
               'point_in_time_certified': False,
               'interpretation': 'Receipt-logged REST observations and hypothetical decisions. No orders, guaranteed fills or independently certified exchange timestamps.'}
     errors, unavailable, points, seen_tasks = Counter(), Counter(), {}, set()
+    timestamp_checks = {'checked_samples': 0, 'rejected_samples': 0,
+                        'future_timestamp': 0, 'nonwhole_timestamp': 0,
+                        'min_source_minus_receipt_ms': None, 'max_source_minus_receipt_ms': None,
+                        'rejected_examples': []}
+    report['stream_timestamp_checks'] = timestamp_checks
     deadline, last_metadata, last_progress = monotonic() + minutes * 60, -math.inf, monotonic()
     wall_deadline = started + timedelta(minutes=minutes)
     def expired():
@@ -188,12 +193,40 @@ def run_shadow(run_dir, *, minutes=60, interval=0.5, timeout=10, paths=2000, boo
                         item = {'kind': 'error', 'source': 'stream', 'reason': frame['error']}
                     else:
                         values = frame['value']
-                        if any(p['time_ms'] % 1000 or p['time_ms']/1000 > parse_time(frame['stream_received_at']).timestamp() for p in values):
-                            errors['stream:future_or_nonwhole_sample'] += 1
-                            continue
+                        socket_time = parse_time(frame['stream_received_at']).timestamp()
+                        checks, reasons = [], set()
+                        for point in values:
+                            lead_ms = (point['time_ms']/1000 - socket_time)*1000
+                            nonwhole = bool(point['time_ms'] % 1000)
+                            future = point['time_ms']/1000 > socket_time
+                            check = {'source_time_ms': point['time_ms'],
+                                     'source_minus_receipt_ms': lead_ms,
+                                     'nonwhole_timestamp': nonwhole, 'future_timestamp': future}
+                            checks.append(check)
+                            timestamp_checks['checked_samples'] += 1
+                            timestamp_checks['rejected_samples'] += bool(nonwhole or future)
+                            for name, bad in (('future_timestamp', future), ('nonwhole_timestamp', nonwhole)):
+                                if bad:
+                                    reasons.add(name)
+                                    timestamp_checks[name] += 1
+                            for key, operation in (('min_source_minus_receipt_ms', min),
+                                                   ('max_source_minus_receipt_ms', max)):
+                                old = timestamp_checks[key]
+                                timestamp_checks[key] = lead_ms if old is None else operation(old, lead_ms)
+                            if (nonwhole or future) and len(timestamp_checks['rejected_examples']) < 10:
+                                timestamp_checks['rejected_examples'].append({
+                                    **check, 'stream_received_at': frame['stream_received_at']})
                         # Availability is conservatively the time the main loop records
                         # the queued tick. Actual socket receipt is retained separately.
-                        item = {**frame, 'kind': 'index'}
+                        if reasons:
+                            for reason in reasons:
+                                errors['stream:' + reason] += 1
+                            item = {'kind': 'error', 'source': 'stream', 'reason': 'rejected_index_sample',
+                                    'reasons': sorted(reasons), 'timestamp_checks': checks,
+                                    'stream_received_at': frame['stream_received_at'],
+                                    'response_sha256': frame['response_sha256']}
+                        else:
+                            item = {**frame, 'kind': 'index'}
                     item.update(id=next_id, request_started_at=received, received_at=received)
                     next_id += 1
                     append(observations, item)
